@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Archive, Download, Film, Image as ImageIcon, PenTool, Volume2 } from 'lucide-react';
 import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
 import { DownloadTray } from './components/DownloadTray';
@@ -185,12 +185,17 @@ export function App() {
     }
   };
 
-  const navItems: { id: WorkspaceTab; label: string }[] = [
-    { id: 'editor', label: 'Brand Editor' },
-    { id: 'instagram', label: 'Instagram Studio' },
-    { id: 'video', label: 'Video Studio' },
-    { id: 'sfx', label: 'Sound Effects' },
-    { id: 'vault', label: 'Asset Vault' },
+  const navItems: {
+    id: WorkspaceTab;
+    label: string;
+    mobileLabel: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
+    { id: 'editor', label: 'Brand Editor', mobileLabel: 'Editor', icon: PenTool },
+    { id: 'instagram', label: 'Instagram Studio', mobileLabel: 'Instagram', icon: ImageIcon },
+    { id: 'video', label: 'Video Studio', mobileLabel: 'Video', icon: Film },
+    { id: 'sfx', label: 'Sound Effects', mobileLabel: 'SFX', icon: Volume2 },
+    { id: 'vault', label: 'Asset Vault', mobileLabel: 'Vault', icon: Archive },
   ];
 
   return (
@@ -215,10 +220,10 @@ export function App() {
           </span>
         </button>
 
-        {/* Zone 2: Clean Single-Line Navigation Links */}
+        {/* Zone 2: Clean Single-Line Navigation Links (Desktop / Tablet) */}
         <nav
           aria-label="Primary workspaces"
-          className="flex items-center gap-5 sm:gap-8 h-full overflow-x-auto"
+          className="hidden md:flex items-center gap-6 lg:gap-8 h-full overflow-x-auto"
         >
           {navItems.map((item) => {
             const active = activeTab === item.id;
@@ -265,7 +270,7 @@ export function App() {
       </header>
 
       {/* Main Active Workspace */}
-      <main className="flex-1">
+      <main className="flex-1 pb-20 md:pb-0">
         {activeTab === 'editor' && (
           <BrandEditor
             config={brandConfig}
@@ -324,6 +329,48 @@ export function App() {
           />
         )}
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Mobile navigation"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-800 pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="grid grid-cols-5 h-16">
+          {navItems.map((item) => {
+            const active = activeTab === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`relative flex flex-col items-center justify-center gap-1 px-1 transition-colors ${
+                  active
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0 inset-x-3 h-0.5 rounded-b-full bg-[#5C7CFA]"
+                  />
+                )}
+                <Icon
+                  className={`w-4.5 h-4.5 transition-colors ${
+                    active ? 'text-[#5C7CFA]' : 'text-slate-400'
+                  }`}
+                />
+                <span className="text-[11px] font-medium leading-none tracking-tight">
+                  {item.mobileLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
       <DownloadTray />
     </div>
   );

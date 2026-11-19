@@ -35,7 +35,7 @@ export const DownloadTray: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-3 bottom-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:w-[390px] z-50 bg-[#0F172A] text-white border border-slate-700/80 rounded-2xl shadow-2xl p-3.5"
+      className="fixed inset-x-3 bottom-20 md:inset-x-auto md:right-5 md:bottom-5 md:w-[390px] z-50 bg-[#0F172A] text-white border border-slate-700/80 rounded-2xl shadow-2xl p-3.5"
     >
       <div className="flex items-start gap-3">
         {item.kind === 'image' || item.kind === 'svg' ? (
