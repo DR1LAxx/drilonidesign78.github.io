@@ -719,3 +719,40 @@ export async function searchCC0AudioLibrary(
   const data = (await res.json()) as { tracks?: CC0WebTrack[] };
   return data.tracks || [];
 }
+
+/**
+ * Fetches live sound effects from https://mixkit.co/free-sound-effects/ via /api/mixkit-sfx.
+ */
+export async function fetchMixkitSfx(options: {
+  category?: string;
+  query?: string;
+  page?: number;
+}): Promise<{
+  items: import('../types/brand').MixkitSfxItem[];
+  sourceUrl: string;
+}> {
+  const params = new URLSearchParams();
+  if (options.category) params.set('category', options.category);
+  if (options.query) params.set('q', options.query);
+  if (options.page && options.page > 1) params.set('page', String(options.page));
+
+  const res = await fetch(`/api/mixkit-sfx?${params.toString()}`);
+  if (!res.ok) {
+    let msg = `Mixkit request failed (${res.status})`;
+    try {
+      const json = (await res.json()) as { error?: string };
+      if (json.error) msg = json.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as {
+    items?: import('../types/brand').MixkitSfxItem[];
+    sourceUrl?: string;
+  };
+  return {
+    items: data.items || [],
+    sourceUrl: data.sourceUrl || 'https://mixkit.co/free-sound-effects/',
+  };
+}

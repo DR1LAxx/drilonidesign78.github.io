@@ -21,6 +21,7 @@ import {
   SavedVideoDesign,
   VideoConfig,
 } from '../types/brand';
+import { saveUrlAsFile } from '../utils/downloadHelper';
 import { OkarinaMark } from './OkarinaMark';
 
 interface AssetVaultProps {
@@ -75,30 +76,25 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
       : ORIGINAL_ASSETS.filter((a) => a.category === filter);
 
   const triggerDownload = (path: string, filename: string) => {
-    const a = document.createElement('a');
-    a.href = path;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    saveUrlAsFile(path, filename);
   };
 
   return (
     <div className="max-w-[1320px] mx-auto px-6 py-8">
       {/* Header Row */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-[#0B1120]">
+          <h1 className="font-display text-2xl font-semibold text-white">
             Asset Vault
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-400 mt-1">
             All 18 original okarina source files and your saved custom editions.
             Click any asset to inspect or open it in the editor.
           </p>
         </div>
 
         {/* Category Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 rounded-lg self-start">
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0F172A] border border-slate-800 rounded-lg self-start">
           {(
             [
               { id: 'all', label: `All Originals (${ORIGINAL_ASSETS.length})` },
@@ -115,8 +111,8 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
               onClick={() => setFilter(tab.id)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                 filter === tab.id
-                  ? 'bg-white text-[#0B1120] shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#1E293B] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               {tab.label}
@@ -129,11 +125,11 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
       {filter === 'saved' ? (
         <div className="mt-8 space-y-10">
           {savedTotal === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-              <p className="font-display text-lg font-semibold text-[#0B1120]">
+            <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-12 text-center">
+              <p className="font-display text-lg font-semibold text-white">
                 No saved versions yet
               </p>
-              <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+              <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">
                 Customize any okarina logo in the Brand Editor or build a
                 template in Instagram Studio, then click Save to store it here.
               </p>
@@ -142,7 +138,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
             <>
               {savedBrandVersions.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-[#0B1120] mb-4">
+                  <h2 className="text-sm font-semibold text-slate-200 mb-4">
                     Saved Brand Versions ({savedBrandVersions.length})
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -151,11 +147,11 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       return (
                         <div
                           key={ver.id}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col"
+                          className="bg-[#0F172A] border border-slate-800 rounded-xl overflow-hidden flex flex-col"
                         >
                           <div
                             className={`h-44 flex items-center justify-center p-6 ${
-                              ver.transparentBg ? 'bg-checkerboard' : ''
+                              ver.transparentBg ? 'bg-checkerboard-dark' : ''
                             }`}
                             style={{
                               backgroundColor: ver.transparentBg
@@ -183,12 +179,12 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                               )}
                             </div>
                           </div>
-                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-800">
                             <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-[#0B1120] truncate">
+                              <h3 className="text-sm font-semibold text-white truncate">
                                 {ver.name}
                               </h3>
-                              <p className="text-xs text-slate-500 mt-0.5">
+                              <p className="text-xs text-slate-400 mt-0.5">
                                 {fmt.label} · {ver.savedAt}
                               </p>
                             </div>
@@ -196,7 +192,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onEditBrandPreset(ver)}
-                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#0B1120] text-white hover:bg-slate-800 transition-colors"
+                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors"
                               >
                                 Edit
                               </button>
@@ -204,7 +200,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                                 type="button"
                                 onClick={() => onDeleteBrandVersion(ver.id)}
                                 aria-label={`Delete ${ver.name}`}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -219,7 +215,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
 
               {savedInstagramDesigns.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-[#0B1120] mb-4">
+                  <h2 className="text-sm font-semibold text-slate-200 mb-4">
                     Saved Instagram Templates ({savedInstagramDesigns.length})
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -228,7 +224,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       return (
                         <div
                           key={des.id}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col"
+                          className="bg-[#0F172A] border border-slate-800 rounded-xl overflow-hidden flex flex-col"
                         >
                           <div
                             className="h-44 p-5 flex flex-col justify-between"
@@ -250,12 +246,12 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                               {des.footerHandle} · {fmt.ratioLabel}
                             </span>
                           </div>
-                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-800">
                             <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-[#0B1120] truncate">
+                              <h3 className="text-sm font-semibold text-white truncate">
                                 {des.name}
                               </h3>
-                              <p className="text-xs text-slate-500 mt-0.5">
+                              <p className="text-xs text-slate-400 mt-0.5">
                                 {fmt.label} · {des.savedAt}
                               </p>
                             </div>
@@ -271,7 +267,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                                 type="button"
                                 onClick={() => onDeleteInstagramDesign(des.id)}
                                 aria-label={`Delete ${des.name}`}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -285,7 +281,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
               )}
               {savedVideoDesigns.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-[#0B1120] mb-4">
+                  <h2 className="text-sm font-semibold text-slate-200 mb-4">
                     Saved Video Projects ({savedVideoDesigns.length})
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -294,7 +290,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       return (
                         <div
                           key={vid.id}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col"
+                          className="bg-[#0F172A] border border-slate-800 rounded-xl overflow-hidden flex flex-col"
                         >
                           <div
                             className="h-44 p-5 flex flex-col justify-between"
@@ -316,12 +312,12 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                               {vid.footerHandle} · {fmt.ratioLabel}
                             </span>
                           </div>
-                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-800">
                             <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-[#0B1120] truncate">
+                              <h3 className="text-sm font-semibold text-white truncate">
                                 {vid.name}
                               </h3>
-                              <p className="text-xs text-slate-500 mt-0.5">
+                              <p className="text-xs text-slate-400 mt-0.5">
                                 {fmt.label} · {vid.savedAt}
                               </p>
                             </div>
@@ -337,7 +333,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                                 type="button"
                                 onClick={() => onDeleteVideoDesign(vid.id)}
                                 aria-label={`Delete ${vid.name}`}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -358,22 +354,22 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
           {visibleOriginals.map((asset) => {
             const tileBg =
               asset.theme === 'transparent'
-                ? 'bg-checkerboard'
+                ? 'bg-checkerboard-dark'
                 : asset.theme === 'dark'
-                ? 'bg-[#0B1120]'
+                ? 'bg-[#080D1A]'
                 : asset.theme === 'indigo'
-                ? 'bg-[#E6EAF2]'
-                : 'bg-[#F5F7FB]';
+                ? 'bg-[#1B2544]'
+                : 'bg-[#E9EEF8]';
 
             return (
               <article
                 key={asset.id}
-                className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col transition-colors hover:border-slate-300"
+                className="bg-[#0F172A] border border-slate-800 rounded-xl overflow-hidden flex flex-col transition-colors hover:border-slate-700"
               >
                 <button
                   type="button"
                   onClick={() => setSelectedAsset(asset)}
-                  className={`h-52 w-full flex items-center justify-center p-6 ${tileBg} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2939F0]`}
+                  className={`h-52 w-full flex items-center justify-center p-6 ${tileBg} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5C7CFA]`}
                 >
                   <img
                     src={asset.path}
@@ -383,12 +379,12 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                   />
                 </button>
 
-                <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-800">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-[#0B1120] truncate">
+                    <h3 className="text-sm font-semibold text-white truncate">
                       {asset.title}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5">
                       {asset.dimensionsLabel}
                     </p>
                   </div>
@@ -398,7 +394,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       type="button"
                       onClick={() => onEditBrandPreset(asset.editorPreset)}
                       title="Edit this version in Brand Editor"
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#0B1120] text-white hover:bg-slate-800 transition-colors whitespace-nowrap"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap"
                     >
                       <SlidersHorizontal className="w-3 h-3" />
                       Edit
@@ -410,7 +406,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       }
                       title="Download original PNG"
                       aria-label={`Download ${asset.title}`}
-                      className="p-1.5 text-slate-600 hover:text-[#0B1120] border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="p-1.5 text-slate-300 hover:text-white border border-slate-700 bg-[#0B1120] rounded-lg hover:bg-slate-800 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>
@@ -425,24 +421,24 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
       {/* Lightbox Modal for Inspecting Original Asset */}
       {selectedAsset && (
         <div
-          className="fixed inset-0 z-50 bg-[#0B1120]/70 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setSelectedAsset(null)}
         >
           <div
-            className="bg-white rounded-2xl max-w-3xl w-full overflow-hidden border border-slate-200 shadow-xl"
+            className="bg-[#0F172A] rounded-2xl max-w-3xl w-full overflow-hidden border border-slate-800 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-display text-lg font-semibold text-[#0B1120]">
+                <h3 className="font-display text-lg font-semibold text-white">
                   {selectedAsset.title}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-400">
                   {selectedAsset.dimensionsLabel}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center p-1 bg-slate-100 rounded-lg">
+                <div className="flex items-center p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                   {(['checker', 'light', 'dark'] as const).map((bg) => (
                     <button
                       key={bg}
@@ -450,8 +446,8 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       onClick={() => setInspectBg(bg)}
                       className={`px-2.5 py-1 text-xs font-medium rounded-md ${
                         inspectBg === bg
-                          ? 'bg-white text-[#0B1120] shadow-xs'
-                          : 'text-slate-600'
+                          ? 'bg-[#1E293B] text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       {bg === 'checker'
@@ -466,7 +462,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                   type="button"
                   onClick={() => setSelectedAsset(null)}
                   aria-label="Close preview"
-                  className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100"
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -476,9 +472,9 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
             <div
               className={`h-[380px] flex items-center justify-center p-8 ${
                 inspectBg === 'checker'
-                  ? 'bg-checkerboard'
+                  ? 'bg-checkerboard-dark'
                   : inspectBg === 'dark'
-                  ? 'bg-[#0B1120]'
+                  ? 'bg-[#080D1A]'
                   : 'bg-[#F5F7FB]'
               }`}
             >
@@ -490,7 +486,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
               />
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-white">
+            <div className="px-6 py-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-[#0F172A]">
               <span className="text-xs font-mono-tabular text-slate-400">
                 Original source asset
               </span>
@@ -503,7 +499,7 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                       `${selectedAsset.id}.png`
                     )
                   }
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-800 hover:bg-slate-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Original PNG

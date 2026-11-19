@@ -1267,6 +1267,8 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   audioStartSec: 0,
   audioFadeInOut: true,
   sfxId: 'none',
+  sfxCustomUrl: '',
+  sfxCustomTitle: '',
   sfxTiming: 'intro',
   sfxVolume: 0.75,
 };

@@ -14,11 +14,11 @@ import {
 } from '../data/brandPresets';
 import { BrandAssetFormat, BrandConfig } from '../types/brand';
 import {
-  downloadDataUrl,
   downloadSvgString,
   generateBrandAssetSVG,
   renderBrandAssetToCanvas,
 } from '../utils/canvasRenderers';
+import { saveCanvasAsPng } from '../utils/downloadHelper';
 import { ColorField } from './ColorField';
 
 interface BrandEditorProps {
@@ -45,7 +45,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
   exportTrigger,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [stageBg, setStageBg] = useState<'light' | 'dark' | 'checker'>('light');
+  const [stageBg, setStageBg] = useState<'light' | 'dark' | 'checker'>('dark');
   const [versionName, setVersionName] = useState(config.name || 'Custom Version');
   const [justSaved, setJustSaved] = useState(false);
 
@@ -74,10 +74,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
     const slug = (versionName || config.format)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-');
-    downloadDataUrl(
-      offscreen.toDataURL('image/png'),
-      `okarina-${config.format}-${slug}.png`
-    );
+    saveCanvasAsPng(offscreen, `okarina-${config.format}-${slug}.png`);
   };
 
   const handleExportSvg = () => {
@@ -121,9 +118,9 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_320px] gap-0 min-h-[calc(100vh-65px)]">
       {/* Left Rail: Format Selector */}
-      <aside className="bg-white border-b lg:border-b-0 lg:border-r border-slate-200 p-5 flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-b lg:border-b-0 lg:border-r border-slate-800 p-5 flex flex-col gap-6">
         <div>
-          <h2 className="text-xs font-semibold text-slate-500 mb-3">
+          <h2 className="text-xs font-semibold text-slate-400 mb-3">
             Asset Format
           </h2>
           <div className="flex flex-col gap-1">
@@ -135,10 +132,10 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                   key={fmt}
                   type="button"
                   onClick={() => update({ format: fmt })}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
                     active
-                      ? 'bg-[#0B1120] text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                      : 'text-slate-300 border-transparent hover:bg-[#131C31] hover:text-white'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -147,7 +144,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                     </span>
                     <span
                       className={`text-[11px] font-mono-tabular shrink-0 ${
-                        active ? 'text-slate-300' : 'text-slate-400'
+                        active ? 'text-[#18D5A8]' : 'text-slate-500'
                       }`}
                     >
                       {item.width}×{item.height}
@@ -159,8 +156,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
           </div>
         </div>
 
-        <div className="pt-5 border-t border-slate-100">
-          <h2 className="text-xs font-semibold text-slate-500 mb-3">
+        <div className="pt-5 border-t border-slate-800">
+          <h2 className="text-xs font-semibold text-slate-400 mb-3">
             Brand Presets
           </h2>
           <div className="grid grid-cols-2 gap-2">
@@ -169,10 +166,10 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                 key={preset.id}
                 type="button"
                 onClick={() => update(preset.values)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-left transition-colors"
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-800 hover:border-slate-600 bg-[#0B1120] hover:bg-[#131C31] text-left transition-colors"
               >
                 <span
-                  className="w-4 h-4 rounded-full border border-slate-200 shrink-0 flex items-center justify-center"
+                  className="w-4 h-4 rounded-full border border-slate-700 shrink-0 flex items-center justify-center"
                   style={{ backgroundColor: preset.previewBg }}
                 >
                   <span
@@ -180,7 +177,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                     style={{ backgroundColor: preset.previewMark }}
                   />
                 </span>
-                <span className="text-xs font-medium text-slate-700 truncate">
+                <span className="text-xs font-medium text-slate-200 truncate">
                   {preset.label}
                 </span>
               </button>
@@ -190,14 +187,14 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
       </aside>
 
       {/* Center Stage: Live Artboard */}
-      <section className="bg-[#F2F5FA] p-6 lg:p-8 flex flex-col justify-between gap-6">
+      <section className="bg-[#080D1A] p-6 lg:p-8 flex flex-col justify-between gap-6">
         {/* Stage Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-xl font-semibold text-[#0B1120]">
+            <h1 className="font-display text-xl font-semibold text-white">
               {meta.label}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
               <span className="font-mono-tabular">
                 {meta.width} × {meta.height} px
               </span>
@@ -207,7 +204,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center p-1 bg-white border border-slate-200 rounded-lg">
+            <div className="flex items-center p-1 bg-[#0F172A] border border-slate-800 rounded-lg">
               {(['light', 'dark', 'checker'] as const).map((mode) => (
                 <button
                   key={mode}
@@ -215,8 +212,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                   onClick={() => setStageBg(mode)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                     stageBg === mode
-                      ? 'bg-[#0B1120] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-[#1E293B] text-white'
+                      : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   {mode === 'light' ? 'Light' : mode === 'dark' ? 'Dark' : 'Grid'}
@@ -230,7 +227,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap ${
                 config.showSafeZone
                   ? 'bg-[#2939F0] text-white border-[#2939F0]'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  : 'bg-[#0F172A] text-slate-300 border-slate-800 hover:bg-slate-800'
               }`}
             >
               <Grid className="w-3.5 h-3.5" />
@@ -241,19 +238,19 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
 
         {/* Artboard Preview */}
         <div
-          className={`flex-1 min-h-[380px] rounded-xl border border-slate-200/90 flex items-center justify-center p-6 lg:p-10 transition-colors ${
+          className={`flex-1 min-h-[380px] rounded-xl border border-slate-800 flex items-center justify-center p-6 lg:p-10 transition-colors ${
             stageBg === 'dark'
-              ? 'bg-[#090E1A]'
+              ? 'bg-[#0B1120]'
               : stageBg === 'checker'
-              ? 'bg-checkerboard'
+              ? 'bg-checkerboard-dark'
               : 'bg-white'
           }`}
         >
           <div className="relative max-w-full flex items-center justify-center">
             <canvas
               ref={canvasRef}
-              className={`max-w-full max-h-[540px] w-auto h-auto rounded-lg shadow-sm border border-slate-200/70 ${
-                config.transparentBg ? 'bg-checkerboard' : ''
+              className={`max-w-full max-h-[540px] w-auto h-auto rounded-lg shadow-sm border border-slate-800/80 ${
+                config.transparentBg ? 'bg-checkerboard-dark' : ''
               }`}
             />
             {config.showSafeZone && (
@@ -266,7 +263,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
         </div>
 
         {/* Bottom Export & Save Bar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-[200px]">
             <input
               type="text"
@@ -274,16 +271,16 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
               onChange={(e) => setVersionName(e.target.value)}
               placeholder="Version name (e.g. Q4 Dark Lockup)"
               aria-label="Version name"
-              className="flex-1 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="flex-1 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
             >
               {justSaved ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-[#18D5A8]" />
                   Saved
                 </>
               ) : (
@@ -299,7 +296,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
             <button
               type="button"
               onClick={handleExportSvg}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 transition-colors whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap"
             >
               <FileCode2 className="w-3.5 h-3.5" />
               Download SVG
@@ -317,9 +314,9 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
       </section>
 
       {/* Right Inspector: Controls */}
-      <aside className="bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-t lg:border-t-0 lg:border-l border-slate-800 p-5 overflow-y-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#0B1120]">
+          <h2 className="text-sm font-semibold text-white">
             Customize Version
           </h2>
           <button
@@ -327,7 +324,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
             onClick={() =>
               onChange({ ...DEFAULT_BRAND_CONFIG, format: config.format })
             }
-            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-white transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Reset
@@ -335,17 +332,17 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
         </div>
 
         {/* Surface & Background */}
-        <div className="space-y-3.5 pb-5 border-b border-slate-100">
+        <div className="space-y-3.5 pb-5 border-b border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-slate-400">
               Canvas & Surface
             </span>
-            <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+            <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
                 checked={config.transparentBg}
                 onChange={(e) => update({ transparentBg: e.target.checked })}
-                className="rounded border-slate-300 accent-[#2939F0]"
+                className="rounded border-slate-600 accent-[#5C7CFA]"
               />
               Transparent
             </label>
@@ -370,8 +367,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
         </div>
 
         {/* Mark Colors */}
-        <div className="space-y-3.5 pb-5 border-b border-slate-100">
-          <span className="block text-xs font-semibold text-slate-500">
+        <div className="space-y-3.5 pb-5 border-b border-slate-800">
+          <span className="block text-xs font-semibold text-slate-400">
             Okarina Mark
           </span>
           <ColorField
@@ -401,20 +398,20 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
 
         {/* Wordmark & Accent */}
         {showWordmarkControls && (
-          <div className="space-y-3.5 pb-5 border-b border-slate-100">
-            <span className="block text-xs font-semibold text-slate-500">
+          <div className="space-y-3.5 pb-5 border-b border-slate-800">
+            <span className="block text-xs font-semibold text-slate-400">
               Wordmark & Accent
             </span>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Brand Name
               </label>
               <input
                 type="text"
                 value={config.brandText}
                 onChange={(e) => update({ brandText: e.target.value })}
-                className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             </div>
 
@@ -425,14 +422,14 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
             />
 
             <div className="flex items-center justify-between pt-1">
-              <label className="text-xs font-medium text-slate-700">
+              <label className="text-xs font-medium text-slate-300">
                 Signature Accent Bar
               </label>
               <input
                 type="checkbox"
                 checked={config.showAccentBar}
                 onChange={(e) => update({ showAccentBar: e.target.checked })}
-                className="rounded border-slate-300 accent-[#2939F0]"
+                className="rounded border-slate-600 accent-[#5C7CFA]"
               />
             </div>
 
@@ -445,14 +442,14 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
             )}
 
             <div className="flex items-center justify-between pt-1">
-              <label className="text-xs font-medium text-slate-700">
+              <label className="text-xs font-medium text-slate-300">
                 Include Tagline
               </label>
               <input
                 type="checkbox"
                 checked={config.showTagline}
                 onChange={(e) => update({ showTagline: e.target.checked })}
-                className="rounded border-slate-300 accent-[#2939F0]"
+                className="rounded border-slate-600 accent-[#5C7CFA]"
               />
             </div>
 
@@ -462,7 +459,7 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
                 value={config.tagline}
                 onChange={(e) => update({ tagline: e.target.value })}
                 placeholder="Tagline text"
-                className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             )}
           </div>
@@ -470,14 +467,14 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
 
         {/* Geometry Sliders */}
         <div className="space-y-4">
-          <span className="block text-xs font-semibold text-slate-500">
+          <span className="block text-xs font-semibold text-slate-400">
             Proportions
           </span>
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="font-medium text-slate-700">Mark Scale</span>
-              <span className="font-mono-tabular text-slate-500">
+              <span className="font-medium text-slate-300">Mark Scale</span>
+              <span className="font-mono-tabular text-slate-400">
                 {Math.round(config.markScale * 100)}%
               </span>
             </div>
@@ -495,8 +492,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
           {showWordmarkControls && (
             <div>
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-medium text-slate-700">Letter Tracking</span>
-                <span className="font-mono-tabular text-slate-500">
+                <span className="font-medium text-slate-300">Letter Tracking</span>
+                <span className="font-mono-tabular text-slate-400">
                   {config.letterSpacing.toFixed(2)}em
                 </span>
               </div>
@@ -517,8 +514,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
           {(config.format === 'app-icon' || config.format === 'favicon') && (
             <div>
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-medium text-slate-700">Corner Radius</span>
-                <span className="font-mono-tabular text-slate-500">
+                <span className="font-medium text-slate-300">Corner Radius</span>
+                <span className="font-mono-tabular text-slate-400">
                   {config.cornerRadius}%
                 </span>
               </div>
@@ -538,8 +535,8 @@ export const BrandEditor: React.FC<BrandEditorProps> = ({
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="font-medium text-slate-700">Spacing / Padding</span>
-              <span className="font-mono-tabular text-slate-500">
+              <span className="font-medium text-slate-300">Spacing / Padding</span>
+              <span className="font-mono-tabular text-slate-400">
                 {Math.round(config.padding * 100)}%
               </span>
             </div>

@@ -19,7 +19,7 @@ export const ColorField: React.FC<ColorFieldProps> = ({
   return (
     <div className={disabled ? 'opacity-45 pointer-events-none' : ''}>
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <label className="text-xs font-medium text-slate-700">{label}</label>
+        <label className="text-xs font-medium text-slate-300">{label}</label>
         <div className="flex items-center gap-1.5">
           <input
             type="text"
@@ -29,9 +29,9 @@ export const ColorField: React.FC<ColorFieldProps> = ({
               if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v);
             }}
             aria-label={`${label} hex value`}
-            className="w-20 px-2 py-1 text-xs font-mono-tabular text-slate-700 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#2939F0]"
+            className="w-20 px-2 py-1 text-xs font-mono-tabular text-slate-100 bg-[#0B1120] border border-slate-700 rounded-md focus:outline-none focus:border-[#5C7CFA]"
           />
-          <label className="relative w-7 h-7 rounded-md border border-slate-200 overflow-hidden cursor-pointer shrink-0 shadow-xs">
+          <label className="relative w-7 h-7 rounded-md border border-slate-700 overflow-hidden cursor-pointer shrink-0 shadow-xs">
             <span
               className="block w-full h-full"
               style={{ backgroundColor: value }}
@@ -58,8 +58,8 @@ export const ColorField: React.FC<ColorFieldProps> = ({
                 onClick={() => onChange(swatch.hex)}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-110 ${
                   active
-                    ? 'ring-2 ring-[#2939F0] ring-offset-1 border-slate-300'
-                    : 'border-slate-300/80'
+                    ? 'ring-2 ring-[#5C7CFA] ring-offset-1 ring-offset-[#0F172A] border-slate-300'
+                    : 'border-slate-600'
                 }`}
                 style={{ backgroundColor: swatch.hex }}
               />

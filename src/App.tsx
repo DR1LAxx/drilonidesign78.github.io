@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
+import { DownloadTray } from './components/DownloadTray';
 import { InstagramStudio } from './components/InstagramStudio';
 import { OkarinaMark } from './components/OkarinaMark';
-import { SoundEffectsStudio } from './components/SoundEffectsStudio';
+import {
+  SoundEffectsStudio,
+  VideoSfxSelection,
+} from './components/SoundEffectsStudio';
 import { VideoStudio } from './components/VideoStudio';
 import {
   DEFAULT_BRAND_CONFIG,
@@ -17,7 +21,6 @@ import {
   SavedBrandVersion,
   SavedInstagramDesign,
   SavedVideoDesign,
-  SfxId,
   VideoConfig,
   WorkspaceTab,
 } from './types/brand';
@@ -149,15 +152,22 @@ export function App() {
     setActiveTab('video');
   };
 
-  const handleSendSfxToVideo = (
-    sfxId: SfxId,
-    sfxTiming: 'intro' | 'mid' | 'outro'
-  ) => {
-    setVideoConfig((prev) => ({
-      ...prev,
-      sfxId,
-      sfxTiming,
-    }));
+  const handleSendSfxToVideo = (selection: VideoSfxSelection) => {
+    if (selection.kind === 'mixkit') {
+      setVideoConfig((prev) => ({
+        ...prev,
+        sfxId: 'mixkit',
+        sfxCustomUrl: selection.audioUrl,
+        sfxCustomTitle: selection.title,
+        sfxTiming: selection.timing,
+      }));
+    } else {
+      setVideoConfig((prev) => ({
+        ...prev,
+        sfxId: selection.sfxId,
+        sfxTiming: selection.timing,
+      }));
+    }
     setActiveTab('video');
   };
 
@@ -184,23 +194,23 @@ export function App() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F8FC] text-[#0B1120]">
+    <div className="min-h-screen flex flex-col bg-[#080D1A] text-slate-50">
       {/* Top Bar: 3-zone contract */}
-      <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-8">
+      <header className="sticky top-0 z-30 h-16 bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-4 sm:gap-8">
         {/* Zone 1: Single-line Brand Wordmark */}
         <button
           type="button"
           onClick={() => setActiveTab('editor')}
-          className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2939F0] rounded-md"
+          className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5C7CFA] rounded-md"
         >
           <OkarinaMark
-            fill="#2939F0"
-            detailColor="#FFFFFF"
-            subtleDetailColor="#B8C4FF"
+            fill="#5C7CFA"
+            detailColor="#0B1120"
+            subtleDetailColor="#1E294B"
             mouthpieceColor="#0B1120"
             className="h-7 w-auto"
           />
-          <span className="font-display text-xl font-semibold tracking-tight text-[#0B1120]">
+          <span className="font-display text-xl font-semibold tracking-tight text-white">
             okarina
           </span>
         </button>
@@ -208,7 +218,7 @@ export function App() {
         {/* Zone 2: Clean Single-Line Navigation Links */}
         <nav
           aria-label="Primary workspaces"
-          className="flex items-center gap-6 sm:gap-8 h-full overflow-x-auto"
+          className="flex items-center gap-5 sm:gap-8 h-full overflow-x-auto"
         >
           {navItems.map((item) => {
             const active = activeTab === item.id;
@@ -219,15 +229,15 @@ export function App() {
                 onClick={() => setActiveTab(item.id)}
                 className={`relative h-full inline-flex items-center text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
                   active
-                    ? 'text-[#0B1120]'
-                    : 'text-slate-500 hover:text-[#0B1120]'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {item.label}
                 {active && (
                   <span
                     aria-hidden="true"
-                    className="absolute bottom-0 inset-x-0 h-0.5 bg-[#2939F0]"
+                    className="absolute bottom-0 inset-x-0 h-0.5 bg-[#5C7CFA]"
                   />
                 )}
               </button>
@@ -240,7 +250,7 @@ export function App() {
           <button
             type="button"
             onClick={handlePrimaryAction}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
             {activeTab === 'vault'
@@ -287,6 +297,7 @@ export function App() {
         {activeTab === 'sfx' && (
           <SoundEffectsStudio
             activeVideoSfxId={videoConfig.sfxId ?? 'none'}
+            activeVideoSfxUrl={videoConfig.sfxCustomUrl}
             onSendToVideo={handleSendSfxToVideo}
           />
         )}
@@ -313,6 +324,7 @@ export function App() {
           />
         )}
       </main>
+      <DownloadTray />
     </div>
   );
 }

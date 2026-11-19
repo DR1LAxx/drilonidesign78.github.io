@@ -182,9 +182,21 @@ export interface VideoConfig {
   audioStartSec: number;
   audioFadeInOut: boolean;
   // Optional SFX Cue Layer
-  sfxId: SfxId | 'none';
+  sfxId: SfxId | 'mixkit' | 'none';
+  sfxCustomUrl: string;
+  sfxCustomTitle: string;
   sfxTiming: 'intro' | 'mid' | 'outro';
   sfxVolume: number;
+}
+
+export interface MixkitSfxItem {
+  id: string;
+  title: string;
+  tags: string[];
+  durationLabel: string;
+  audioUrl: string;
+  license: string;
+  sourceUrl: string;
 }
 
 export type SfxCategory =

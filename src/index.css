@@ -2,6 +2,7 @@
 
 @layer base {
   :root {
+    color-scheme: dark;
     --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
@@ -9,8 +10,8 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: #F6F8FC;
-    color: #0B1120;
+    background-color: #080D1A;
+    color: #F8FAFC;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -49,5 +50,5 @@
 
 /* Custom sleek range input */
 input[type="range"] {
-  accent-color: #2939F0;
+  accent-color: #5C7CFA;
 }

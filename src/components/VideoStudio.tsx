@@ -41,7 +41,7 @@ import {
   renderStudioAudioTrack,
   searchCC0AudioLibrary,
 } from '../utils/audioEngine';
-import { downloadDataUrl } from '../utils/canvasRenderers';
+import { saveBlobFile } from '../utils/downloadHelper';
 import { renderSoundEffect } from '../utils/sfxEngine';
 import {
   pickSupportedVideoMimeType,
@@ -248,7 +248,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     };
   }, [config.audioMode, config.studioTrackId]);
 
-  // Synthesize optional SFX cue layer when selected
+  // Synthesize optional Studio SFX cue or fetch & decode Mixkit SFX cue
   useEffect(() => {
     const activeSfx = config.sfxId ?? 'none';
     if (activeSfx === 'none') {
@@ -256,21 +256,32 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       return;
     }
     let cancelled = false;
-    renderSoundEffect(activeSfx)
-      .then((buf) => {
-        if (!cancelled) {
-          setSfxBuffer(buf);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSfxBuffer(null);
-        }
-      });
+    if (activeSfx === 'mixkit') {
+      if (!config.sfxCustomUrl) {
+        setSfxBuffer(null);
+        return;
+      }
+      const ctx = getAudioContext();
+      fetchAndDecodeAudioUrl(config.sfxCustomUrl, ctx)
+        .then((buf) => {
+          if (!cancelled) setSfxBuffer(buf);
+        })
+        .catch(() => {
+          if (!cancelled) setSfxBuffer(null);
+        });
+    } else {
+      renderSoundEffect(activeSfx)
+        .then((buf) => {
+          if (!cancelled) setSfxBuffer(buf);
+        })
+        .catch(() => {
+          if (!cancelled) setSfxBuffer(null);
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, [config.sfxId]);
+  }, [config.sfxId, config.sfxCustomUrl, getAudioContext]);
 
   const getSfxCueStartSec = useCallback(
     (
@@ -613,9 +624,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const handleDownloadWavTrack = () => {
     if (!audioBuffer) return;
     const wav = audioBufferToWavBlob(audioBuffer);
-    const url = URL.createObjectURL(wav);
-    downloadDataUrl(url, `okarina-${config.studioTrackId}.wav`);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saveBlobFile(wav, `okarina-${config.studioTrackId}.wav`);
   };
 
   const handleExportVideo = useCallback(async () => {
@@ -720,7 +729,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
-      const recorder = new MediaRecorder(combinedStream, recorderOptions);
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(combinedStream, recorderOptions);
+      } catch {
+        recorder = new MediaRecorder(
+          combinedStream,
+          mimeType ? { mimeType } : undefined
+        );
+      }
       const chunks: BlobPart[] = [];
 
       recorder.ondataavailable = (ev) => {
@@ -798,18 +815,18 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       videoStream.getTracks().forEach((t) => t.stop());
 
       if (!exportAbortRef.current && chunks.length > 0) {
+        const finalMime = recorder.mimeType || mimeType || 'video/webm';
+        const finalExt = finalMime.includes('mp4') ? 'mp4' : extension;
         const blob = new Blob(chunks, {
-          type: mimeType || 'video/webm',
+          type: finalMime,
         });
-        const url = URL.createObjectURL(blob);
         const slug = (designName || config.templateId)
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-');
-        downloadDataUrl(
-          url,
-          `okarina-video-${config.format}-${slug}.${extension}`
+        saveBlobFile(
+          blob,
+          `okarina-video-${config.format}-${slug}.${finalExt}`
         );
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
       }
     } catch (err) {
       setExportError(
@@ -852,8 +869,16 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const handleTestSfxCue = async () => {
     const activeSfx = config.sfxId ?? 'none';
     if (activeSfx === 'none') return;
-    const buf = sfxBuffer || (await renderSoundEffect(activeSfx));
     const ctx = getAudioContext();
+    let buf = sfxBuffer;
+    if (!buf) {
+      if (activeSfx === 'mixkit' && config.sfxCustomUrl) {
+        buf = await fetchAndDecodeAudioUrl(config.sfxCustomUrl, ctx);
+      } else if (activeSfx !== 'mixkit') {
+        buf = await renderSoundEffect(activeSfx);
+      }
+    }
+    if (!buf) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const gain = ctx.createGain();
@@ -866,20 +891,21 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const activeTrackMeta = STUDIO_AUDIO_TRACKS.find(
     (t) => t.id === config.studioTrackId
   );
-  const activeSfxMeta = SFX_CATALOG.find(
-    (s) => s.id === (config.sfxId ?? 'none')
-  );
+  const activeSfxLabel =
+    (config.sfxId ?? 'none') === 'mixkit'
+      ? config.sfxCustomTitle || 'Mixkit SFX'
+      : SFX_CATALOG.find((s) => s.id === (config.sfxId ?? 'none'))?.title || '';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[276px_minmax(0,1fr)_345px] gap-0 min-h-[calc(100vh-65px)]">
       {/* Left Rail: Format, Duration, Templates, Photo */}
-      <aside className="bg-white border-b lg:border-b-0 lg:border-r border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-b lg:border-b-0 lg:border-r border-slate-800 p-5 overflow-y-auto flex flex-col gap-6">
         {/* Video Format */}
         <div>
-          <h2 className="text-xs font-semibold text-slate-500 mb-2.5">
+          <h2 className="text-xs font-semibold text-slate-400 mb-2.5">
             Video Aspect Ratio
           </h2>
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
             {(['reel', 'square', 'portrait', 'landscape'] as VideoFormat[]).map(
               (fmt) => {
                 const active = config.format === fmt;
@@ -892,8 +918,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                     onClick={() => update({ format: fmt })}
                     className={`py-2 px-2 rounded-md text-center transition-colors ${
                       active
-                        ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900 font-medium'
+                        ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 font-medium'
                     }`}
                   >
                     <div className="text-xs leading-tight whitespace-nowrap">
@@ -911,10 +937,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
         {/* Duration */}
         <div>
-          <h2 className="text-xs font-semibold text-slate-500 mb-2">
+          <h2 className="text-xs font-semibold text-slate-400 mb-2">
             Clip Duration
           </h2>
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-4 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
             {DURATIONS.map((sec) => (
               <button
                 key={sec}
@@ -926,8 +952,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 }}
                 className={`py-1.5 text-xs font-mono-tabular rounded-md transition-colors ${
                   config.durationSec === sec
-                    ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {sec}s
@@ -937,8 +963,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
         </div>
 
         {/* Motion Templates */}
-        <div className="pb-5 border-b border-slate-100">
-          <h2 className="text-xs font-semibold text-slate-500 mb-2.5">
+        <div className="pb-5 border-b border-slate-800">
+          <h2 className="text-xs font-semibold text-slate-400 mb-2.5">
             Motion Templates
           </h2>
           <div className="space-y-1.5">
@@ -957,15 +983,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   }
                   className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
                     active
-                      ? 'bg-[#0B1120] text-white border-[#0B1120]'
-                      : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                      : 'bg-[#0B1120] text-slate-200 border-slate-800 hover:border-slate-700 hover:bg-[#131C31]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold">{tpl.name}</span>
                     <span
                       className={`text-[10px] font-mono-tabular ${
-                        active ? 'text-[#18D5A8]' : 'text-slate-400'
+                        active ? 'text-[#18D5A8]' : 'text-slate-500'
                       }`}
                     >
                       {VIDEO_FORMAT_META[tpl.recommendedFormat].ratioLabel}
@@ -973,7 +999,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   </div>
                   <p
                     className={`text-[11px] mt-0.5 leading-snug ${
-                      active ? 'text-slate-300' : 'text-slate-500'
+                      active ? 'text-slate-300' : 'text-slate-400'
                     }`}
                   >
                     {tpl.subtitle}
@@ -987,14 +1013,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
         {/* Background Photo */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-slate-500">
+            <h2 className="text-xs font-semibold text-slate-400">
               Ken Burns Photo (Optional)
             </h2>
             {config.photoDataUrl && (
               <button
                 type="button"
                 onClick={() => update({ photoDataUrl: null })}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 hover:text-rose-300"
               >
                 <Trash2 className="w-3 h-3" />
                 Remove
@@ -1011,27 +1037,27 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           <button
             type="button"
             onClick={() => photoInputRef.current?.click()}
-            className="w-full rounded-xl border border-dashed border-slate-300 hover:border-[#2939F0] bg-slate-50/70 p-3 text-center transition-colors"
+            className="w-full rounded-xl border border-dashed border-slate-700 hover:border-[#5C7CFA] bg-[#0B1120] p-3 text-center transition-colors"
           >
             {config.photoDataUrl ? (
               <div className="flex items-center gap-3 text-left">
                 <img
                   src={config.photoDataUrl}
                   alt="Video background"
-                  className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                  className="w-10 h-10 rounded-lg object-cover border border-slate-700 shrink-0"
                 />
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[#0B1120] truncate">
+                  <div className="text-xs font-semibold text-white truncate">
                     Photo layer active
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] text-slate-400">
                     Click to replace image
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 py-1 text-xs font-medium text-slate-700">
-                <ImagePlus className="w-4 h-4 text-[#2939F0]" />
+              <div className="flex items-center justify-center gap-2 py-1 text-xs font-medium text-slate-200">
+                <ImagePlus className="w-4 h-4 text-[#5C7CFA]" />
                 Add background photo
               </div>
             )}
@@ -1040,7 +1066,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           {config.photoDataUrl && (
             <div className="mt-3">
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="font-medium text-slate-600">Contrast Scrim</span>
+                <span className="font-medium text-slate-300">Contrast Scrim</span>
                 <span className="font-mono-tabular text-slate-400">
                   {Math.round(config.scrimOpacity * 100)}%
                 </span>
@@ -1062,14 +1088,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       </aside>
 
       {/* Center Stage: Live Video Player + Transport + Export */}
-      <section className="bg-[#F2F5FA] p-6 lg:p-8 flex flex-col justify-between gap-5">
+      <section className="bg-[#080D1A] p-6 lg:p-8 flex flex-col justify-between gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-xl font-semibold text-[#0B1120] flex items-center gap-2">
-              <Film className="w-4 h-4 text-[#2939F0]" />
+            <h1 className="font-display text-xl font-semibold text-white flex items-center gap-2">
+              <Film className="w-4 h-4 text-[#5C7CFA]" />
               {meta.label} Video
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
               <span className="font-mono-tabular">
                 {meta.width} × {meta.height} px · {config.durationSec}s
               </span>
@@ -1084,18 +1110,18 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   : config.audioMode === 'upload'
                   ? `Audio: ${config.uploadedAudioName || 'Uploaded file'}`
                   : 'Audio: External URL'}
-                {activeSfxMeta ? ` + SFX: ${activeSfxMeta.title}` : ''}
+                {activeSfxLabel ? ` + SFX: ${activeSfxLabel}` : ''}
               </span>
             </p>
           </div>
         </div>
 
         {/* Live Canvas Viewport */}
-        <div className="flex-1 min-h-[420px] rounded-xl border border-slate-200/90 bg-white flex flex-col items-center justify-center p-6 gap-4">
+        <div className="flex-1 min-h-[420px] rounded-xl border border-slate-800 bg-[#0B1120] flex flex-col items-center justify-center p-6 gap-4">
           <div className="relative flex items-center justify-center">
             <canvas
               ref={canvasRef}
-              className={`rounded-xl shadow-md border border-slate-200/80 w-auto h-auto ${
+              className={`rounded-xl shadow-md border border-slate-800 w-auto h-auto ${
                 config.format === 'reel'
                   ? 'max-h-[560px] max-w-full'
                   : config.format === 'landscape'
@@ -1105,7 +1131,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
             />
 
             {isExporting && (
-              <div className="absolute inset-0 rounded-xl bg-[#0B1120]/75 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-white text-center">
+              <div className="absolute inset-0 rounded-xl bg-[#080D1A]/85 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-white text-center">
                 <Loader2 className="w-7 h-7 animate-spin text-[#18D5A8] mb-3" />
                 <p className="font-display text-base font-semibold">
                   Rendering Video & Synced Audio
@@ -1134,13 +1160,13 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           </div>
 
           {/* Transport Scrub Bar */}
-          <div className="w-full max-w-xl flex items-center gap-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="w-full max-w-xl flex items-center gap-3 px-3 py-2 bg-[#0F172A] border border-slate-800 rounded-xl">
             <button
               type="button"
               disabled={isExporting || audioLoading}
               onClick={() => setIsPlaying((p) => !p)}
               aria-label={isPlaying ? 'Pause video preview' : 'Play video preview'}
-              className="w-8 h-8 rounded-lg bg-[#0B1120] text-white flex items-center justify-center hover:bg-slate-800 transition-colors shrink-0 disabled:opacity-50"
+              className="w-8 h-8 rounded-lg bg-[#2939F0] text-white flex items-center justify-center hover:bg-[#1E2CD4] transition-colors shrink-0 disabled:opacity-50"
             >
               {isPlaying ? (
                 <Pause className="w-3.5 h-3.5" />
@@ -1157,7 +1183,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 setPlayheadSec(0);
               }}
               aria-label="Restart preview"
-              className="p-1.5 text-slate-500 hover:text-[#0B1120] rounded-lg hover:bg-slate-200/60 transition-colors shrink-0"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -1177,7 +1203,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               className="flex-1"
             />
 
-            <span className="text-xs font-mono-tabular text-slate-600 shrink-0 w-20 text-right">
+            <span className="text-xs font-mono-tabular text-slate-300 shrink-0 w-20 text-right">
               {playheadSec.toFixed(1)}s / {config.durationSec}s
             </span>
 
@@ -1185,10 +1211,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               type="button"
               onClick={() => setIsMuted((m) => !m)}
               aria-label={isMuted ? 'Unmute preview audio' : 'Mute preview audio'}
-              className="p-1.5 text-slate-600 hover:text-[#0B1120] rounded-lg hover:bg-slate-200/60 transition-colors shrink-0"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
             >
               {isMuted ? (
-                <VolumeX className="w-4 h-4 text-rose-500" />
+                <VolumeX className="w-4 h-4 text-rose-400" />
               ) : (
                 <Volume2 className="w-4 h-4" />
               )}
@@ -1197,13 +1223,13 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
         </div>
 
         {exportError && (
-          <div className="px-4 py-2.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl">
+          <div className="px-4 py-2.5 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl">
             {exportError}
           </div>
         )}
 
         {/* Bottom Save & Render Bar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-[200px]">
             <input
               type="text"
@@ -1211,16 +1237,16 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               onChange={(e) => setDesignName(e.target.value)}
               placeholder="Video project name"
               aria-label="Video project name"
-              className="flex-1 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="flex-1 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
             >
               {justSaved ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-[#18D5A8]" />
                   Saved
                 </>
               ) : (
@@ -1254,12 +1280,12 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       </section>
 
       {/* Right Inspector: Audio Source + Copy + Styling */}
-      <aside className="bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-t lg:border-t-0 lg:border-l border-slate-800 p-5 overflow-y-auto flex flex-col gap-6">
         {/* Audio Source Section */}
-        <div className="space-y-3.5 pb-5 border-b border-slate-100">
+        <div className="space-y-3.5 pb-5 border-b border-slate-800">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-              <Music2 className="w-3.5 h-3.5 text-[#2939F0]" />
+            <h2 className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+              <Music2 className="w-3.5 h-3.5 text-[#5C7CFA]" />
               Audio Source
             </h2>
             {audioBuffer && config.audioMode !== 'none' && (
@@ -1270,7 +1296,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           </div>
 
           {/* Audio Source Mode Switcher */}
-          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-5 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
             {(
               [
                 { id: 'studio', label: 'Studio' },
@@ -1293,8 +1319,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 }}
                 className={`py-1.5 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap ${
                   config.audioMode === mode.id
-                    ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {mode.label}
@@ -1306,7 +1332,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           {config.audioMode === 'studio' && (
             <div className="space-y-2.5">
               {/* Category filter & quick search */}
-              <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="flex flex-wrap gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                 {(
                   [
                     { id: 'all', label: 'All (18)' },
@@ -1322,8 +1348,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                     onClick={() => setStudioCategory(cat.id)}
                     className={`flex-1 py-1 px-1.5 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap ${
                       studioCategory === cat.id
-                        ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-slate-100'
                     }`}
                   >
                     {cat.label}
@@ -1339,7 +1365,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   onChange={(e) => setStudioSearch(e.target.value)}
                   placeholder="Filter tracks (e.g. rain, lo-fi, flute)..."
                   aria-label="Filter studio tracks"
-                  className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
                 />
               </div>
 
@@ -1369,8 +1395,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                       }}
                       className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                         active
-                          ? 'bg-[#0B1120] text-white border-[#0B1120]'
-                          : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                          : 'bg-[#0B1120] text-slate-200 border-slate-800 hover:bg-[#131C31]'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -1379,7 +1405,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                         </span>
                         <span
                           className={`text-[10px] font-mono-tabular shrink-0 ${
-                            active ? 'text-[#18D5A8]' : 'text-slate-400'
+                            active ? 'text-[#18D5A8]' : 'text-slate-500'
                           }`}
                         >
                           {track.bpm} BPM · {track.keyLabel}
@@ -1387,16 +1413,12 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                       </div>
                       <p
                         className={`text-[11px] mt-0.5 leading-snug ${
-                          active ? 'text-slate-300' : 'text-slate-500'
+                          active ? 'text-slate-300' : 'text-slate-400'
                         }`}
                       >
                         {track.vibe}
                       </p>
-                      <div
-                        className={`text-[10px] mt-1 ${
-                          active ? 'text-slate-400' : 'text-slate-400'
-                        }`}
-                      >
+                      <div className="text-[10px] mt-1 text-slate-500">
                         {track.category} · {track.license}
                       </div>
                     </button>
@@ -1408,7 +1430,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 <button
                   type="button"
                   onClick={handleDownloadWavTrack}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Active Track (.wav)
@@ -1430,7 +1452,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   }}
                   placeholder="Search free CC0 audio..."
                   aria-label="Search CC0 public domain audio"
-                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
                 />
                 <button
                   type="button"
@@ -1455,7 +1477,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                       key={tag}
                       type="button"
                       onClick={() => handleSearchCC0(tag)}
-                      className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                      className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-[#0B1120] border border-slate-800 text-slate-300 hover:bg-slate-800 transition-colors"
                     >
                       {tag}
                     </button>
@@ -1464,15 +1486,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               </div>
 
               {cc0SearchError && (
-                <div className="p-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="p-2 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   {cc0SearchError}
                 </div>
               )}
 
               <div className="max-h-60 overflow-y-auto space-y-1.5 pr-0.5">
                 {cc0Searching ? (
-                  <div className="py-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#2939F0]" />
+                  <div className="py-6 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#5C7CFA]" />
                     Searching CC0 & Public Domain catalog...
                   </div>
                 ) : (
@@ -1486,8 +1508,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                         onClick={() => handleSelectCC0Track(track)}
                         className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                           active
-                            ? 'bg-[#0B1120] text-white border-[#0B1120]'
-                            : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                            ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                            : 'bg-[#0B1120] text-slate-200 border-slate-800 hover:bg-[#131C31]'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -1496,7 +1518,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                           </span>
                           <span
                             className={`text-[10px] font-mono-tabular shrink-0 ${
-                              active ? 'text-[#18D5A8]' : 'text-slate-400'
+                              active ? 'text-[#18D5A8]' : 'text-slate-500'
                             }`}
                           >
                             {track.lengthLabel}
@@ -1504,7 +1526,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                         </div>
                         <div
                           className={`text-[11px] mt-0.5 truncate ${
-                            active ? 'text-slate-300' : 'text-slate-500'
+                            active ? 'text-slate-300' : 'text-slate-400'
                           }`}
                         >
                           {track.creator} · {track.license}
@@ -1514,7 +1536,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   })
                 )}
               </div>
-              <p className="text-[10px] text-slate-400 leading-snug">
+              <p className="text-[10px] text-slate-500 leading-snug">
                 Filtered strictly to CC0 1.0 & Public Domain recordings via
                 Internet Archive.
               </p>
@@ -1534,13 +1556,13 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               <button
                 type="button"
                 onClick={() => audioInputRef.current?.click()}
-                className="w-full rounded-xl border border-dashed border-slate-300 hover:border-[#2939F0] bg-slate-50 p-4 text-center transition-colors"
+                className="w-full rounded-xl border border-dashed border-slate-700 hover:border-[#5C7CFA] bg-[#0B1120] p-4 text-center transition-colors"
               >
-                <Upload className="w-5 h-5 text-[#2939F0] mx-auto mb-1.5" />
-                <div className="text-xs font-semibold text-[#0B1120] truncate">
+                <Upload className="w-5 h-5 text-[#5C7CFA] mx-auto mb-1.5" />
+                <div className="text-xs font-semibold text-white truncate">
                   {config.uploadedAudioName || 'Choose MP3, WAV, M4A, or OGG'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
+                <div className="text-[11px] text-slate-400 mt-0.5">
                   Decoded locally in your browser
                 </div>
               </button>
@@ -1550,7 +1572,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           {/* External Audio URL */}
           {config.audioMode === 'url' && (
             <div className="space-y-2">
-              <label className="block text-[11px] font-medium text-slate-600">
+              <label className="block text-[11px] font-medium text-slate-300">
                 Direct Audio Link (.mp3, .wav, .ogg)
               </label>
               <div className="flex gap-1.5">
@@ -1559,7 +1581,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   placeholder="https://example.com/track.mp3"
-                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
                 />
                 <button
                   type="button"
@@ -1583,14 +1605,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           )}
 
           {audioLoading && (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2939F0]" />
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5C7CFA]" />
               Preparing audio buffer...
             </div>
           )}
 
           {audioError && (
-            <div className="p-2.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
+            <div className="p-2.5 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg">
               {audioError}
             </div>
           )}
@@ -1599,7 +1621,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
             <div className="space-y-3 pt-1">
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="font-medium text-slate-600">Volume</span>
+                  <span className="font-medium text-slate-300">Volume</span>
                   <span className="font-mono-tabular text-slate-400">
                     {Math.round(config.audioVolume * 100)}%
                   </span>
@@ -1620,7 +1642,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               {audioBuffer.duration > 1 && (
                 <div>
                   <div className="flex justify-between text-[11px] mb-1">
-                    <span className="font-medium text-slate-600">
+                    <span className="font-medium text-slate-300">
                       Audio Start Offset
                     </span>
                     <span className="font-mono-tabular text-slate-400">
@@ -1642,7 +1664,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               )}
 
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-slate-700">
+                <label className="text-xs font-medium text-slate-300">
                   Smooth Audio Fade In & Out
                 </label>
                 <input
@@ -1651,26 +1673,26 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   onChange={(e) =>
                     update({ audioFadeInOut: e.target.checked })
                   }
-                  className="rounded border-slate-300 accent-[#2939F0]"
+                  className="rounded border-slate-600 accent-[#5C7CFA]"
                 />
               </div>
             </div>
           )}
 
           {/* SFX Cue Overlay */}
-          <div className="pt-3 border-t border-slate-100 space-y-2.5">
+          <div className="pt-3 border-t border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+              <span className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#18D5A8]" />
-                SFX Cue Layer (CC0)
+                SFX Cue Layer (Mixkit / CC0)
               </span>
               {onOpenSfxStudio && (
                 <button
                   type="button"
                   onClick={onOpenSfxStudio}
-                  className="text-[11px] font-medium text-[#2939F0] hover:underline"
+                  className="text-[11px] font-medium text-[#5C7CFA] hover:underline"
                 >
-                  Open Sound Effects
+                  Browse Mixkit SFX
                 </button>
               )}
             </div>
@@ -1678,12 +1700,17 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
             <select
               value={config.sfxId ?? 'none'}
               onChange={(e) =>
-                update({ sfxId: e.target.value as SfxId | 'none' })
+                update({ sfxId: e.target.value as SfxId | 'mixkit' | 'none' })
               }
               aria-label="Select sound effect cue"
-              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             >
               <option value="none">No SFX Cue</option>
+              {config.sfxCustomUrl && (
+                <option value="mixkit">
+                  Mixkit: {config.sfxCustomTitle || 'Selected Mixkit SFX'}
+                </option>
+              )}
               {SFX_CATALOG.map((sfx) => (
                 <option key={sfx.id} value={sfx.id}>
                   {sfx.title} ({sfx.durationLabel})
@@ -1693,7 +1720,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
             {(config.sfxId ?? 'none') !== 'none' && (
               <div className="space-y-2.5 pt-1">
-                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+                <div className="grid grid-cols-3 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                   {(
                     [
                       { id: 'intro', label: 'Intro (0s)' },
@@ -1707,8 +1734,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                       onClick={() => update({ sfxTiming: pos.id })}
                       className={`py-1 text-[11px] font-medium rounded-md transition-colors ${
                         (config.sfxTiming ?? 'intro') === pos.id
-                          ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                          : 'text-slate-600'
+                          ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       {pos.label}
@@ -1718,7 +1745,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
                 <div>
                   <div className="flex justify-between text-[11px] mb-1">
-                    <span className="font-medium text-slate-600">SFX Level</span>
+                    <span className="font-medium text-slate-300">SFX Level</span>
                     <span className="font-mono-tabular text-slate-400">
                       {Math.round((config.sfxVolume ?? 0.75) * 100)}%
                     </span>
@@ -1739,7 +1766,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 <button
                   type="button"
                   onClick={handleTestSfxCue}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors"
                 >
                   <Play className="w-3 h-3" />
                   Test SFX Cue
@@ -1750,86 +1777,86 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
         </div>
 
         {/* Video Copy */}
-        <div className="space-y-3 pb-5 border-b border-slate-100">
-          <h2 className="text-xs font-semibold text-slate-500">Video Copy</h2>
+        <div className="space-y-3 pb-5 border-b border-slate-800">
+          <h2 className="text-xs font-semibold text-slate-400">Video Copy</h2>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Eyebrow / Label
             </label>
             <input
               type="text"
               value={config.eyebrow}
               onChange={(e) => update({ eyebrow: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Headline
             </label>
             <textarea
               rows={2}
               value={config.headline}
               onChange={(e) => update({ headline: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0] resize-none"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA] resize-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Body / Subtitle
             </label>
             <textarea
               rows={2}
               value={config.body}
               onChange={(e) => update({ body: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0] resize-none"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA] resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Date / Tag
               </label>
               <input
                 type="text"
                 value={config.dateLabel}
                 onChange={(e) => update({ dateLabel: e.target.value })}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-2.5 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Website / Handle
               </label>
               <input
                 type="text"
                 value={config.footerHandle}
                 onChange={(e) => update({ footerHandle: e.target.value })}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-2.5 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Bottom Action Text
             </label>
             <input
               type="text"
               value={config.ctaText}
               onChange={(e) => update({ ctaText: e.target.value })}
-              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
           </div>
         </div>
 
         {/* Theme & Motion */}
         <div className="space-y-3.5">
-          <h2 className="text-xs font-semibold text-slate-500">
+          <h2 className="text-xs font-semibold text-slate-400">
             Backdrop & Motion
           </h2>
 
@@ -1839,10 +1866,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                 key={theme.id}
                 type="button"
                 onClick={() => update(theme.patch)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-left transition-colors"
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-800 hover:border-slate-600 bg-[#0B1120] hover:bg-[#131C31] text-left transition-colors"
               >
                 <span
-                  className="w-4 h-4 rounded-full border border-slate-200 shrink-0 flex items-center justify-center"
+                  className="w-4 h-4 rounded-full border border-slate-700 shrink-0 flex items-center justify-center"
                   style={{ backgroundColor: theme.bg }}
                 >
                   <span
@@ -1850,7 +1877,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                     style={{ backgroundColor: theme.dot }}
                   />
                 </span>
-                <span className="text-xs font-medium text-slate-700">
+                <span className="text-xs font-medium text-slate-200">
                   {theme.label}
                 </span>
               </button>
@@ -1858,7 +1885,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Backdrop Style
             </label>
             <select
@@ -1866,7 +1893,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               onChange={(e) =>
                 update({ backdropStyle: e.target.value as BackdropStyle })
               }
-              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             >
               {BACKDROP_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -1889,17 +1916,17 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
           <div className="grid grid-cols-2 gap-3 pt-1">
             <div>
-              <span className="block text-xs font-medium text-slate-700 mb-1.5">
+              <span className="block text-xs font-medium text-slate-300 mb-1.5">
                 Text Align
               </span>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                 <button
                   type="button"
                   onClick={() => update({ textAlign: 'left' })}
                   className={`py-1.5 flex items-center justify-center rounded-md ${
                     config.textAlign === 'left'
-                      ? 'bg-white text-[#0B1120] shadow-xs'
-                      : 'text-slate-500'
+                      ? 'bg-[#1E293B] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                   aria-label="Align left"
                 >
@@ -1910,8 +1937,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   onClick={() => update({ textAlign: 'center' })}
                   className={`py-1.5 flex items-center justify-center rounded-md ${
                     config.textAlign === 'center'
-                      ? 'bg-white text-[#0B1120] shadow-xs'
-                      : 'text-slate-500'
+                      ? 'bg-[#1E293B] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                   aria-label="Align center"
                 >
@@ -1921,10 +1948,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
             </div>
 
             <div>
-              <span className="block text-xs font-medium text-slate-700 mb-1.5">
+              <span className="block text-xs font-medium text-slate-300 mb-1.5">
                 Lockup
               </span>
-              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                 {(['horizontal', 'mark', 'none'] as const).map((v) => (
                   <button
                     key={v}
@@ -1932,8 +1959,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                     onClick={() => update({ logoVariant: v })}
                     className={`py-1.5 text-[11px] font-medium rounded-md ${
                       config.logoVariant === v
-                        ? 'bg-white text-[#0B1120] shadow-xs'
-                        : 'text-slate-600'
+                        ? 'bg-[#1E293B] text-white shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {v === 'horizontal' ? 'Full' : v === 'mark' ? 'Mark' : 'Off'}
@@ -1945,8 +1972,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
           <div>
             <div className="flex justify-between text-xs mb-1">
-              <span className="font-medium text-slate-700">Motion Energy</span>
-              <span className="font-mono-tabular text-slate-500">
+              <span className="font-medium text-slate-300">Motion Energy</span>
+              <span className="font-mono-tabular text-slate-400">
                 {Math.round(config.motionIntensity * 100)}%
               </span>
             </div>
@@ -1964,14 +1991,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-slate-300">
               Show Audio Spectrum Bars
             </label>
             <input
               type="checkbox"
               checked={config.showWaveform}
               onChange={(e) => update({ showWaveform: e.target.checked })}
-              className="rounded border-slate-300 accent-[#2939F0]"
+              className="rounded border-slate-600 accent-[#5C7CFA]"
             />
           </div>
         </div>

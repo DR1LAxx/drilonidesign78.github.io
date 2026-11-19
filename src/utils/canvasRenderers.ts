@@ -7,6 +7,7 @@ import {
   BrandConfig,
   InstagramConfig,
 } from '../types/brand';
+import { saveBlobFile, saveUrlAsFile } from './downloadHelper';
 
 export interface MarkColors {
   fill: string;
@@ -1149,9 +1150,14 @@ export function renderInstagramToCanvas(
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string) {
+  if (dataUrl.startsWith('data:') || dataUrl.startsWith('blob:') || dataUrl.startsWith('/')) {
+    saveUrlAsFile(dataUrl, filename);
+    return;
+  }
   const link = document.createElement('a');
   link.href = dataUrl;
   link.download = filename;
+  link.rel = 'noopener noreferrer';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1159,7 +1165,5 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
 
 export function downloadSvgString(svg: string, filename: string) {
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  downloadDataUrl(url, filename);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveBlobFile(blob, filename);
 }

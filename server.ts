@@ -100,6 +100,17 @@ async function startServer() {
       const contentType =
         upstream.headers.get('content-type') || 'audio/mpeg';
       res.setHeader('Content-Type', contentType);
+      if (req.query.download === '1') {
+        const rawName =
+          typeof req.query.filename === 'string'
+            ? req.query.filename
+            : 'okarina-audio.mp3';
+        const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, '-');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${safeName}"`
+        );
+      }
       res.setHeader('Cache-Control', 'public, max-age=300');
       res.send(Buffer.from(arrayBuf));
     } catch (err) {
@@ -205,6 +216,157 @@ async function startServer() {
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Failed to search CC0 audio.';
+      res.status(502).json({ error: msg });
+    }
+  });
+
+  // Live catalog & search sourced from https://mixkit.co/free-sound-effects/
+  app.get('/api/mixkit-sfx', async (req, res) => {
+    const rawCat = typeof req.query.category === 'string' ? req.query.category.trim().toLowerCase() : 'all';
+    const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const pageNum = Math.max(1, Math.min(5, Number(req.query.page) || 1));
+
+    const decodeEntities = (str: string) =>
+      str
+        .replace(/&amp;/g, '&')
+        .replace(/&#39;|&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+
+    const parseMixkitHtml = (html: string, pageUrl: string) => {
+      const blocks = html.split('<div class="item-grid__item">').slice(1);
+      const seen = new Set<string>();
+      const items: {
+        id: string;
+        title: string;
+        tags: string[];
+        durationLabel: string;
+        audioUrl: string;
+        license: string;
+        sourceUrl: string;
+      }[] = [];
+
+      for (const block of blocks) {
+        const endIdx = block.indexOf('<div class="item-grid-card__actions');
+        const chunk = endIdx > 0 ? block.slice(0, endIdx + 200) : block.slice(0, 3500);
+        const idMatch = chunk.match(/data-audio-player-item-id-value="(\d+)"/);
+        const urlMatch = chunk.match(/data-audio-player-preview-url-value="(https:\/\/[^"]+)"/);
+        const titleMatch = chunk.match(/<h2 class="item-grid-card__title">\s*([\s\S]*?)\s*<\/h2>/);
+        const durMatch = chunk.match(/data-test-id="duration">\s*([\s\S]*?)\s*<\/div>/);
+        const tagMatches = [...chunk.matchAll(/<a class="meta-links__link"[^>]*>\s*([^<]+?)\s*<\/a>/g)].map((m) =>
+          decodeEntities(m[1].replace(/\s+/g, ' ').trim())
+        );
+
+        if (idMatch && urlMatch && titleMatch) {
+          const id = `mixkit-${idMatch[1]}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          items.push({
+            id,
+            title: decodeEntities(titleMatch[1].replace(/\s+/g, ' ').trim()),
+            tags: [...new Set(tagMatches)].slice(0, 4),
+            durationLabel: durMatch ? durMatch[1].trim() : '0:02',
+            audioUrl: urlMatch[1],
+            license: 'Mixkit Free License',
+            sourceUrl: pageUrl,
+          });
+        }
+      }
+      return items;
+    };
+
+    const fetchMixkitPage = async (url: string) => {
+      const upstream = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!upstream.ok) return [];
+      const html = await upstream.text();
+      return parseMixkitHtml(html, url);
+    };
+
+    try {
+      const pageQuery = pageNum > 1 ? `?page=${pageNum}` : '';
+      let targetUrl = `https://mixkit.co/free-sound-effects/${pageQuery}`;
+      let items: ReturnType<typeof parseMixkitHtml> = [];
+
+      if (rawQ) {
+        const slug = rawQ
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        const words = rawQ
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter((w) => w.length >= 2);
+
+        if (slug) {
+          targetUrl = `https://mixkit.co/free-sound-effects/discover/${slug}/${pageQuery}`;
+          items = await fetchMixkitPage(targetUrl);
+
+          if (items.length === 0) {
+            const catFallbackUrl = `https://mixkit.co/free-sound-effects/${slug}/${pageQuery}`;
+            const catItems = await fetchMixkitPage(catFallbackUrl);
+            if (catItems.length > 0) {
+              targetUrl = catFallbackUrl;
+              items = catItems;
+            }
+          }
+        }
+
+        // For multi-word queries where combined slug has no dedicated Mixkit page, search Mixkit per-word pages
+        if (items.length === 0 && words.length > 1) {
+          for (const word of words) {
+            const wordDiscoverUrl = `https://mixkit.co/free-sound-effects/discover/${word}/${pageQuery}`;
+            let wordItems = await fetchMixkitPage(wordDiscoverUrl);
+            let usedUrl = wordDiscoverUrl;
+            if (wordItems.length === 0) {
+              const wordCatUrl = `https://mixkit.co/free-sound-effects/${word}/${pageQuery}`;
+              wordItems = await fetchMixkitPage(wordCatUrl);
+              usedUrl = wordCatUrl;
+            }
+            if (wordItems.length > 0) {
+              targetUrl = usedUrl;
+              items = wordItems.sort((a, b) => {
+                const hayA = `${a.title} ${a.tags.join(' ')}`.toLowerCase();
+                const hayB = `${b.title} ${b.tags.join(' ')}`.toLowerCase();
+                const scoreA = words.filter((w) => hayA.includes(w)).length;
+                const scoreB = words.filter((w) => hayB.includes(w)).length;
+                return scoreB - scoreA;
+              });
+              break;
+            }
+          }
+        }
+
+        // Local fallback filter on Mixkit main featured page if no dedicated slug matched
+        if (items.length === 0 && words.length > 0) {
+          const pool = await fetchMixkitPage('https://mixkit.co/free-sound-effects/');
+          items = pool.filter((item) => {
+            const hay = `${item.title} ${item.tags.join(' ')}`.toLowerCase();
+            return words.some((w) => hay.includes(w));
+          });
+          targetUrl = 'https://mixkit.co/free-sound-effects/';
+        }
+      } else if (rawCat && rawCat !== 'all' && /^[a-z0-9-]+$/.test(rawCat)) {
+        targetUrl = `https://mixkit.co/free-sound-effects/${rawCat}/${pageQuery}`;
+        items = await fetchMixkitPage(targetUrl);
+      } else {
+        items = await fetchMixkitPage(targetUrl);
+      }
+
+      res.json({
+        items,
+        sourceUrl: targetUrl,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to fetch Mixkit sound effects.';
       res.status(502).json({ error: msg });
     }
   });

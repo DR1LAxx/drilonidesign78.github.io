@@ -22,10 +22,8 @@ import {
   InstagramConfig,
   InstagramFormat,
 } from '../types/brand';
-import {
-  downloadDataUrl,
-  renderInstagramToCanvas,
-} from '../utils/canvasRenderers';
+import { renderInstagramToCanvas } from '../utils/canvasRenderers';
+import { saveCanvasAsPng } from '../utils/downloadHelper';
 import { ColorField } from './ColorField';
 
 interface InstagramStudioProps {
@@ -204,8 +202,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
     const slug = (designName || config.templateId)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-');
-    downloadDataUrl(
-      offscreen.toDataURL('image/png'),
+    saveCanvasAsPng(
+      offscreen,
       `okarina-ig-${config.format}-${slug}.png`
     );
   };
@@ -244,13 +242,13 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[276px_minmax(0,1fr)_330px] gap-0 min-h-[calc(100vh-65px)]">
       {/* Left Rail: Formats, Templates & Photo Upload */}
-      <aside className="bg-white border-b lg:border-b-0 lg:border-r border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-b lg:border-b-0 lg:border-r border-slate-800 p-5 overflow-y-auto flex flex-col gap-6">
         {/* Format Switcher */}
         <div>
-          <h2 className="text-xs font-semibold text-slate-500 mb-2.5">
+          <h2 className="text-xs font-semibold text-slate-400 mb-2.5">
             Instagram Format
           </h2>
-          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
             {(['story', 'post-square', 'post-portrait'] as InstagramFormat[]).map(
               (fmt) => {
                 const active = config.format === fmt;
@@ -262,8 +260,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                     onClick={() => update({ format: fmt })}
                     className={`py-2 px-1.5 rounded-md text-center transition-colors ${
                       active
-                        ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900 font-medium'
+                        ? 'bg-[#1E293B] text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 font-medium'
                     }`}
                   >
                     <div className="text-xs leading-tight whitespace-nowrap">
@@ -284,16 +282,16 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
         </div>
 
         {/* Photo Uploader */}
-        <div className="pb-5 border-b border-slate-100">
+        <div className="pb-5 border-b border-slate-800">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-slate-500">
+            <h2 className="text-xs font-semibold text-slate-400">
               Background Photo
             </h2>
             {config.photoDataUrl && (
               <button
                 type="button"
                 onClick={() => update({ photoDataUrl: null })}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 hover:text-rose-300"
               >
                 <Trash2 className="w-3 h-3" />
                 Remove
@@ -330,8 +328,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
             }}
             className={`cursor-pointer rounded-xl border border-dashed p-3.5 text-center transition-colors ${
               isDraggingFile
-                ? 'border-[#2939F0] bg-[#2939F0]/5'
-                : 'border-slate-300 hover:border-[#2939F0] bg-slate-50/70'
+                ? 'border-[#5C7CFA] bg-[#2939F0]/15'
+                : 'border-slate-700 hover:border-[#5C7CFA] bg-[#0B1120]'
             }`}
           >
             {config.photoDataUrl ? (
@@ -339,24 +337,24 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                 <img
                   src={config.photoDataUrl}
                   alt="Uploaded template background"
-                  className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+                  className="w-11 h-11 rounded-lg object-cover border border-slate-700 shrink-0"
                 />
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[#0B1120] truncate">
+                  <div className="text-xs font-semibold text-white truncate">
                     Custom photo active
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] text-slate-400">
                     Click or drop to replace
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-1.5 py-1">
-                <ImagePlus className="w-5 h-5 text-[#2939F0]" />
-                <div className="text-xs font-medium text-slate-700">
+                <ImagePlus className="w-5 h-5 text-[#5C7CFA]" />
+                <div className="text-xs font-medium text-slate-200">
                   Upload or drop a photo
                 </div>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] text-slate-500">
                   JPG, PNG, or WebP
                 </div>
               </div>
@@ -367,7 +365,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
             <div className="mt-3.5 space-y-2.5">
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="font-medium text-slate-600">Photo Zoom</span>
+                  <span className="font-medium text-slate-300">Photo Zoom</span>
                   <span className="font-mono-tabular text-slate-400">
                     {Math.round(config.photoZoom * 100)}%
                   </span>
@@ -387,7 +385,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <span className="block text-[11px] font-medium text-slate-300 mb-1">
                     Pan X
                   </span>
                   <input
@@ -403,7 +401,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   />
                 </div>
                 <div>
-                  <span className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <span className="block text-[11px] font-medium text-slate-300 mb-1">
                     Pan Y
                   </span>
                   <input
@@ -422,7 +420,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
               <div>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="font-medium text-slate-600">
+                  <span className="font-medium text-slate-300">
                     Contrast Scrim
                   </span>
                   <span className="font-mono-tabular text-slate-400">
@@ -447,7 +445,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
         {/* Templates Gallery */}
         <div>
-          <h2 className="text-xs font-semibold text-slate-500 mb-2.5">
+          <h2 className="text-xs font-semibold text-slate-400 mb-2.5">
             Templates
           </h2>
           <div className="space-y-1.5">
@@ -465,15 +463,15 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   }
                   className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
                     active
-                      ? 'bg-[#0B1120] text-white border-[#0B1120]'
-                      : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                      : 'bg-[#0B1120] text-slate-200 border-slate-800 hover:border-slate-700 hover:bg-[#131C31]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold">{tpl.name}</span>
                     <span
                       className={`text-[10px] font-mono-tabular ${
-                        active ? 'text-[#18D5A8]' : 'text-slate-400'
+                        active ? 'text-[#18D5A8]' : 'text-slate-500'
                       }`}
                     >
                       {tpl.recommendedFormat === 'story'
@@ -485,7 +483,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   </div>
                   <p
                     className={`text-[11px] mt-0.5 leading-snug ${
-                      active ? 'text-slate-300' : 'text-slate-500'
+                      active ? 'text-slate-300' : 'text-slate-400'
                     }`}
                   >
                     {tpl.subtitle}
@@ -498,18 +496,18 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
       </aside>
 
       {/* Center Stage: Live Instagram Canvas */}
-      <section className="bg-[#F2F5FA] p-6 lg:p-8 flex flex-col justify-between gap-5">
+      <section className="bg-[#080D1A] p-6 lg:p-8 flex flex-col justify-between gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-xl font-semibold text-[#0B1120] flex items-center gap-2">
+            <h1 className="font-display text-xl font-semibold text-white flex items-center gap-2">
               {config.format === 'story' ? (
-                <Smartphone className="w-4 h-4 text-[#2939F0]" />
+                <Smartphone className="w-4 h-4 text-[#5C7CFA]" />
               ) : (
-                <Square className="w-4 h-4 text-[#2939F0]" />
+                <Square className="w-4 h-4 text-[#5C7CFA]" />
               )}
               {meta.label}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
               <span className="font-mono-tabular">
                 {meta.width} × {meta.height} px
               </span>
@@ -524,7 +522,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap ${
               config.showSafeZones
                 ? 'bg-[#2939F0] text-white border-[#2939F0]'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                : 'bg-[#0F172A] text-slate-300 border-slate-800 hover:bg-slate-800'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -533,11 +531,11 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
         </div>
 
         {/* Canvas Preview Container */}
-        <div className="flex-1 min-h-[420px] rounded-xl border border-slate-200/90 bg-white flex items-center justify-center p-6">
+        <div className="flex-1 min-h-[420px] rounded-xl border border-slate-800 bg-[#0B1120] flex items-center justify-center p-6">
           <div className="relative flex items-center justify-center">
             <canvas
               ref={canvasRef}
-              className={`rounded-xl shadow-md border border-slate-200/80 w-auto h-auto ${
+              className={`rounded-xl shadow-md border border-slate-800 w-auto h-auto ${
                 config.format === 'story'
                   ? 'max-h-[640px] max-w-full'
                   : 'max-h-[560px] max-w-full'
@@ -572,7 +570,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
         </div>
 
         {/* Bottom Save & Download Bar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-[200px]">
             <input
               type="text"
@@ -580,16 +578,16 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
               onChange={(e) => setDesignName(e.target.value)}
               placeholder="Template name"
               aria-label="Template name"
-              className="flex-1 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="flex-1 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
             >
               {justSaved ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-[#18D5A8]" />
                   Saved
                 </>
               ) : (
@@ -613,90 +611,90 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
       </section>
 
       {/* Right Inspector: Copy & Brand Styling */}
-      <aside className="bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+      <aside className="bg-[#0F172A] border-t lg:border-t-0 lg:border-l border-slate-800 p-5 overflow-y-auto flex flex-col gap-6">
         {/* Copy Editor */}
-        <div className="space-y-3 pb-5 border-b border-slate-100">
-          <h2 className="text-xs font-semibold text-slate-500">
+        <div className="space-y-3 pb-5 border-b border-slate-800">
+          <h2 className="text-xs font-semibold text-slate-400">
             Template Copy
           </h2>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Eyebrow / Label
             </label>
             <input
               type="text"
               value={config.eyebrow}
               onChange={(e) => update({ eyebrow: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Headline
             </label>
             <textarea
               rows={2}
               value={config.headline}
               onChange={(e) => update({ headline: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0] resize-none"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA] resize-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Body / Caption
             </label>
             <textarea
               rows={3}
               value={config.body}
               onChange={(e) => update({ body: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0] resize-none"
+              className="w-full px-3 py-1.5 text-sm text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA] resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Date / Tag
               </label>
               <input
                 type="text"
                 value={config.dateLabel}
                 onChange={(e) => update({ dateLabel: e.target.value })}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-2.5 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Handle
               </label>
               <input
                 type="text"
                 value={config.footerHandle}
                 onChange={(e) => update({ footerHandle: e.target.value })}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                className="w-full px-2.5 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Bottom Action Text
             </label>
             <input
               type="text"
               value={config.ctaText}
               onChange={(e) => update({ ctaText: e.target.value })}
-              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             />
           </div>
         </div>
 
         {/* Theme & Backdrop */}
-        <div className="space-y-3.5 pb-5 border-b border-slate-100">
-          <h2 className="text-xs font-semibold text-slate-500">
+        <div className="space-y-3.5 pb-5 border-b border-slate-800">
+          <h2 className="text-xs font-semibold text-slate-400">
             Color Theme & Backdrop
           </h2>
 
@@ -706,10 +704,10 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                 key={theme.id}
                 type="button"
                 onClick={() => update(theme.patch)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-left transition-colors"
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-slate-800 hover:border-slate-600 bg-[#0B1120] hover:bg-[#131C31] text-left transition-colors"
               >
                 <span
-                  className="w-4 h-4 rounded-full border border-slate-200 shrink-0 flex items-center justify-center"
+                  className="w-4 h-4 rounded-full border border-slate-700 shrink-0 flex items-center justify-center"
                   style={{ backgroundColor: theme.bg }}
                 >
                   <span
@@ -717,7 +715,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                     style={{ backgroundColor: theme.dot }}
                   />
                 </span>
-                <span className="text-xs font-medium text-slate-700">
+                <span className="text-xs font-medium text-slate-200">
                   {theme.label}
                 </span>
               </button>
@@ -725,7 +723,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Backdrop Texture
             </label>
             <select
@@ -733,7 +731,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
               onChange={(e) =>
                 update({ backdropStyle: e.target.value as BackdropStyle })
               }
-              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+              className="w-full px-3 py-1.5 text-xs text-slate-100 bg-[#0B1120] border border-slate-700 rounded-lg focus:outline-none focus:border-[#5C7CFA]"
             >
               {BACKDROP_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -755,7 +753,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
           />
 
           <div className="pt-1">
-            <span className="block text-[11px] font-medium text-slate-500 mb-1.5">
+            <span className="block text-[11px] font-medium text-slate-400 mb-1.5">
               Reuse on okarina.dev
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -768,10 +766,10 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   setCopiedType('prompt');
                   setTimeout(() => setCopiedType(null), 1800);
                 }}
-                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-[#0B1120] hover:bg-slate-800 text-slate-200 transition-colors"
               >
                 {copiedType === 'prompt' ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-[#18D5A8]" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
@@ -786,10 +784,10 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   setCopiedType('css');
                   setTimeout(() => setCopiedType(null), 1800);
                 }}
-                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-[#0B1120] hover:bg-slate-800 text-slate-200 transition-colors"
               >
                 {copiedType === 'css' ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-[#18D5A8]" />
                 ) : (
                   <Code2 className="w-3.5 h-3.5" />
                 )}
@@ -801,15 +799,15 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
         {/* Layout & Lockup */}
         <div className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-500">
+          <h2 className="text-xs font-semibold text-slate-400">
             Layout & Branding
           </h2>
 
           <div>
-            <span className="block text-xs font-medium text-slate-700 mb-1.5">
+            <span className="block text-xs font-medium text-slate-300 mb-1.5">
               Logo Lockup
             </span>
-            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
               {(['horizontal', 'stacked', 'mark', 'none'] as const).map((v) => (
                 <button
                   key={v}
@@ -817,8 +815,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   onClick={() => update({ logoVariant: v })}
                   className={`py-1.5 text-[11px] font-medium rounded-md transition-colors ${
                     config.logoVariant === v
-                      ? 'bg-white text-[#0B1120] shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-[#1E293B] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   {v === 'horizontal'
@@ -835,17 +833,17 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="block text-xs font-medium text-slate-700 mb-1.5">
+              <span className="block text-xs font-medium text-slate-300 mb-1.5">
                 Text Align
               </span>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                 <button
                   type="button"
                   onClick={() => update({ textAlign: 'left' })}
                   className={`py-1.5 flex items-center justify-center rounded-md ${
                     config.textAlign === 'left'
-                      ? 'bg-white text-[#0B1120] shadow-xs'
-                      : 'text-slate-500'
+                      ? 'bg-[#1E293B] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                   aria-label="Align left"
                 >
@@ -856,8 +854,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                   onClick={() => update({ textAlign: 'center' })}
                   className={`py-1.5 flex items-center justify-center rounded-md ${
                     config.textAlign === 'center'
-                      ? 'bg-white text-[#0B1120] shadow-xs'
-                      : 'text-slate-500'
+                      ? 'bg-[#1E293B] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                   aria-label="Align center"
                 >
@@ -867,10 +865,10 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
             </div>
 
             <div>
-              <span className="block text-xs font-medium text-slate-700 mb-1.5">
+              <span className="block text-xs font-medium text-slate-300 mb-1.5">
                 Logo Position
               </span>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-[#0B1120] border border-slate-800 rounded-lg">
                 {(['top', 'bottom'] as const).map((pos) => (
                   <button
                     key={pos}
@@ -878,8 +876,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
                     onClick={() => update({ logoPosition: pos })}
                     className={`py-1.5 text-[11px] font-medium rounded-md ${
                       config.logoPosition === pos
-                        ? 'bg-white text-[#0B1120] shadow-xs'
-                        : 'text-slate-600'
+                        ? 'bg-[#1E293B] text-white shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {pos === 'top' ? 'Top' : 'Bottom'}
@@ -891,8 +889,8 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="font-medium text-slate-700">Headline Scale</span>
-              <span className="font-mono-tabular text-slate-500">
+              <span className="font-medium text-slate-300">Headline Scale</span>
+              <span className="font-mono-tabular text-slate-400">
                 {Math.round(config.headlineScale * 100)}%
               </span>
             </div>
@@ -910,14 +908,14 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-slate-300">
               Show Mint Accent Rule
             </label>
             <input
               type="checkbox"
               checked={config.showMintAccent}
               onChange={(e) => update({ showMintAccent: e.target.checked })}
-              className="rounded border-slate-300 accent-[#2939F0]"
+              className="rounded border-slate-600 accent-[#5C7CFA]"
             />
           </div>
         </div>
