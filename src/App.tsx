@@ -1,0 +1,232 @@
+import React, { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
+import { AssetVault } from './components/AssetVault';
+import { BrandEditor } from './components/BrandEditor';
+import { InstagramStudio } from './components/InstagramStudio';
+import { OkarinaMark } from './components/OkarinaMark';
+import {
+  DEFAULT_BRAND_CONFIG,
+  DEFAULT_INSTAGRAM_CONFIG,
+} from './data/brandPresets';
+import {
+  BrandConfig,
+  InstagramConfig,
+  SavedBrandVersion,
+  SavedInstagramDesign,
+  WorkspaceTab,
+} from './types/brand';
+
+const BRAND_STORAGE_KEY = 'okarina_saved_brand_versions_v1';
+const IG_STORAGE_KEY = 'okarina_saved_ig_designs_v1';
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function App() {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('editor');
+  const [brandConfig, setBrandConfig] = useState<BrandConfig>(
+    DEFAULT_BRAND_CONFIG
+  );
+  const [instagramConfig, setInstagramConfig] = useState<InstagramConfig>(
+    DEFAULT_INSTAGRAM_CONFIG
+  );
+  const [savedBrandVersions, setSavedBrandVersions] = useState<
+    SavedBrandVersion[]
+  >(() => loadFromStorage<SavedBrandVersion[]>(BRAND_STORAGE_KEY, []));
+  const [savedInstagramDesigns, setSavedInstagramDesigns] = useState<
+    SavedInstagramDesign[]
+  >(() => loadFromStorage<SavedInstagramDesign[]>(IG_STORAGE_KEY, []));
+
+  const [brandExportTrigger, setBrandExportTrigger] = useState(0);
+  const [igExportTrigger, setIgExportTrigger] = useState(0);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        BRAND_STORAGE_KEY,
+        JSON.stringify(savedBrandVersions)
+      );
+    } catch {
+      // Ignore quota errors
+    }
+  }, [savedBrandVersions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        IG_STORAGE_KEY,
+        JSON.stringify(savedInstagramDesigns)
+      );
+    } catch {
+      // Ignore quota errors
+    }
+  }, [savedInstagramDesigns]);
+
+  const handleSaveBrandVersion = (cfg: BrandConfig) => {
+    const entry: SavedBrandVersion = {
+      ...cfg,
+      id: `bv-${Date.now()}`,
+      savedAt: new Date().toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }),
+    };
+    setSavedBrandVersions((prev) => [entry, ...prev]);
+  };
+
+  const handleSaveInstagramDesign = (cfg: InstagramConfig) => {
+    // Strip very large photo data URLs only if needed; keep normally for reload
+    const entry: SavedInstagramDesign = {
+      ...cfg,
+      id: `ig-${Date.now()}`,
+      savedAt: new Date().toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }),
+    };
+    setSavedInstagramDesigns((prev) => [entry, ...prev]);
+  };
+
+  const handleEditBrandPreset = (preset: Partial<BrandConfig>) => {
+    setBrandConfig((prev) => ({
+      ...DEFAULT_BRAND_CONFIG,
+      ...prev,
+      ...preset,
+    }));
+    setActiveTab('editor');
+  };
+
+  const handleEditInstagramDesign = (design: InstagramConfig) => {
+    setInstagramConfig(design);
+    setActiveTab('instagram');
+  };
+
+  const handlePrimaryAction = () => {
+    if (activeTab === 'editor') {
+      setBrandExportTrigger((n) => n + 1);
+    } else if (activeTab === 'instagram') {
+      setIgExportTrigger((n) => n + 1);
+    } else {
+      setActiveTab('instagram');
+    }
+  };
+
+  const navItems: { id: WorkspaceTab; label: string }[] = [
+    { id: 'editor', label: 'Brand Editor' },
+    { id: 'instagram', label: 'Instagram Studio' },
+    { id: 'vault', label: 'Asset Vault' },
+  ];
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#F6F8FC] text-[#0B1120]">
+      {/* Top Bar: 3-zone contract */}
+      <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-8">
+        {/* Zone 1: Single-line Brand Wordmark */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('editor')}
+          className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2939F0] rounded-md"
+        >
+          <OkarinaMark
+            fill="#2939F0"
+            detailColor="#FFFFFF"
+            subtleDetailColor="#B8C4FF"
+            mouthpieceColor="#0B1120"
+            className="h-7 w-auto"
+          />
+          <span className="font-display text-xl font-semibold tracking-tight text-[#0B1120]">
+            okarina
+          </span>
+        </button>
+
+        {/* Zone 2: Clean Single-Line Navigation Links */}
+        <nav
+          aria-label="Primary workspaces"
+          className="flex items-center gap-6 sm:gap-8 h-full overflow-x-auto"
+        >
+          {navItems.map((item) => {
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`relative h-full inline-flex items-center text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  active
+                    ? 'text-[#0B1120]'
+                    : 'text-slate-500 hover:text-[#0B1120]'
+                }`}
+              >
+                {item.label}
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute bottom-0 inset-x-0 h-0.5 bg-[#2939F0]"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Zone 3: Single Primary Action */}
+        <div className="shrink-0">
+          <button
+            type="button"
+            onClick={handlePrimaryAction}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {activeTab === 'vault' ? 'New Instagram Post' : 'Export PNG'}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Active Workspace */}
+      <main className="flex-1">
+        {activeTab === 'editor' && (
+          <BrandEditor
+            config={brandConfig}
+            onChange={setBrandConfig}
+            onSaveVersion={handleSaveBrandVersion}
+            exportTrigger={brandExportTrigger}
+          />
+        )}
+
+        {activeTab === 'instagram' && (
+          <InstagramStudio
+            config={instagramConfig}
+            onChange={setInstagramConfig}
+            onSaveDesign={handleSaveInstagramDesign}
+            exportTrigger={igExportTrigger}
+          />
+        )}
+
+        {activeTab === 'vault' && (
+          <AssetVault
+            savedBrandVersions={savedBrandVersions}
+            savedInstagramDesigns={savedInstagramDesigns}
+            onEditBrandPreset={handleEditBrandPreset}
+            onEditInstagramDesign={handleEditInstagramDesign}
+            onDeleteBrandVersion={(id) =>
+              setSavedBrandVersions((prev) => prev.filter((v) => v.id !== id))
+            }
+            onDeleteInstagramDesign={(id) =>
+              setSavedInstagramDesigns((prev) =>
+                prev.filter((d) => d.id !== id)
+              )
+            }
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;

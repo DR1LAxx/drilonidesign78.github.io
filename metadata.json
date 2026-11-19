@@ -1,0 +1,6 @@
+{
+  "name": "okarina Brand Studio",
+  "description": "Brand identity editor, asset vault, and Instagram Story & Post template generator for okarina.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
