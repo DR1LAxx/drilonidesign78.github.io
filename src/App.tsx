@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Archive, Download, Film, Image as ImageIcon, PenTool, Volume2 } from 'lucide-react';
+import { Archive, Download, Film, Image as ImageIcon, Menu, PenTool, Volume2, X } from 'lucide-react';
 import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
 import { DownloadTray } from './components/DownloadTray';
@@ -40,6 +40,7 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 
 export function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('editor');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [brandConfig, setBrandConfig] = useState<BrandConfig>(
     DEFAULT_BRAND_CONFIG
   );
@@ -185,17 +186,25 @@ export function App() {
     }
   };
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
+
   const navItems: {
     id: WorkspaceTab;
     label: string;
-    mobileLabel: string;
     icon: React.ComponentType<{ className?: string }>;
   }[] = [
-    { id: 'editor', label: 'Brand Editor', mobileLabel: 'Editor', icon: PenTool },
-    { id: 'instagram', label: 'Instagram Studio', mobileLabel: 'Instagram', icon: ImageIcon },
-    { id: 'video', label: 'Video Studio', mobileLabel: 'Video', icon: Film },
-    { id: 'sfx', label: 'Sound Effects', mobileLabel: 'SFX', icon: Volume2 },
-    { id: 'vault', label: 'Asset Vault', mobileLabel: 'Vault', icon: Archive },
+    { id: 'editor', label: 'Brand Editor', icon: PenTool },
+    { id: 'instagram', label: 'Instagram Studio', icon: ImageIcon },
+    { id: 'video', label: 'Video Studio', icon: Film },
+    { id: 'sfx', label: 'Sound Effects', icon: Volume2 },
+    { id: 'vault', label: 'Asset Vault', icon: Archive },
   ];
 
   return (
@@ -250,12 +259,12 @@ export function App() {
           })}
         </nav>
 
-        {/* Zone 3: Single Primary Action */}
-        <div className="shrink-0">
+        {/* Zone 3: Primary Action + Mobile Hamburger Toggle */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handlePrimaryAction}
-            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
             {activeTab === 'vault'
@@ -266,11 +275,80 @@ export function App() {
               ? 'Open Video Studio'
               : 'Export PNG'}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-workspace-menu"
+            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-700 bg-[#0B1120] text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            {mobileMenuOpen ? (
+              <X className="w-4.5 h-4.5" />
+            ) : (
+              <Menu className="w-4.5 h-4.5" />
+            )}
+          </button>
         </div>
       </header>
 
+      {/* Mobile Hamburger Menu Overlay & Drawer */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            aria-hidden="true"
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 top-16 z-30 bg-black/60 backdrop-blur-xs"
+          />
+          <nav
+            id="mobile-workspace-menu"
+            aria-label="Mobile navigation"
+            className="md:hidden fixed inset-x-0 top-16 z-40 bg-[#0F172A] border-b border-slate-800 shadow-2xl px-4 py-3"
+          >
+            <div className="flex flex-col gap-1.5">
+              {navItems.map((item) => {
+                const active = activeTab === item.id;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    aria-current={active ? 'page' : undefined}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-left transition-colors ${
+                      active
+                        ? 'bg-[#182342] text-white border-[#5C7CFA]'
+                        : 'bg-[#0B1120] text-slate-300 border-slate-800 hover:bg-[#131C31] hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icon
+                        className={`w-4 h-4 ${
+                          active ? 'text-[#5C7CFA]' : 'text-slate-400'
+                        }`}
+                      />
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </span>
+                    {active && (
+                      <span
+                        aria-hidden="true"
+                        className="w-2 h-2 rounded-full bg-[#18D5A8]"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        </>
+      )}
+
       {/* Main Active Workspace */}
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1">
         {activeTab === 'editor' && (
           <BrandEditor
             config={brandConfig}
@@ -329,47 +407,6 @@ export function App() {
           />
         )}
       </main>
-
-      {/* Mobile Bottom Navigation Bar */}
-      <nav
-        aria-label="Mobile navigation"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-800 pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="grid grid-cols-5 h-16">
-          {navItems.map((item) => {
-            const active = activeTab === item.id;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveTab(item.id)}
-                aria-current={active ? 'page' : undefined}
-                className={`relative flex flex-col items-center justify-center gap-1 px-1 transition-colors ${
-                  active
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {active && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-0 inset-x-3 h-0.5 rounded-b-full bg-[#5C7CFA]"
-                  />
-                )}
-                <Icon
-                  className={`w-4.5 h-4.5 transition-colors ${
-                    active ? 'text-[#5C7CFA]' : 'text-slate-400'
-                  }`}
-                />
-                <span className="text-[11px] font-medium leading-none tracking-tight">
-                  {item.mobileLabel}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
 
       <DownloadTray />
     </div>
