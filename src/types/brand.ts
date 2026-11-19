@@ -1,4 +1,4 @@
-export type WorkspaceTab = 'editor' | 'instagram' | 'video' | 'vault';
+export type WorkspaceTab = 'editor' | 'instagram' | 'video' | 'sfx' | 'vault';
 
 export type BrandAssetFormat =
   | 'primary'
@@ -108,14 +108,38 @@ export type VideoTemplateId =
   | 'launch-teaser'
   | 'editorial-reel';
 
-export type AudioSourceMode = 'studio' | 'upload' | 'url' | 'none';
+export type AudioSourceMode = 'studio' | 'cc0web' | 'upload' | 'url' | 'none';
+
+export type AudioCategory = 'music' | 'ambient' | 'beats' | 'soundscapes';
 
 export type StudioAudioTrackId =
   | 'okarina-breeze'
-  | 'midnight-mesh'
+  | 'mint-horizon'
   | 'indigo-pulse'
   | 'quiet-studio'
-  | 'mint-horizon';
+  | 'dawn-arpeggio'
+  | 'velvet-chord'
+  | 'midnight-mesh'
+  | 'oceanic-drift'
+  | 'tape-warmth'
+  | 'deep-space-wash'
+  | 'late-night-desk'
+  | 'crisp-tech-beat'
+  | 'soft-percussion'
+  | 'sunday-coffee'
+  | 'gentle-rain-chimes'
+  | 'forest-wind-ocarina'
+  | 'studio-room-pulse'
+  | 'golden-hour-shimmer';
+
+export interface CC0WebTrack {
+  id: string;
+  title: string;
+  creator: string;
+  license: string;
+  lengthLabel: string;
+  audioUrl: string;
+}
 
 export interface VideoConfig {
   id?: string;
@@ -157,6 +181,53 @@ export interface VideoConfig {
   audioVolume: number; // 0 to 1
   audioStartSec: number;
   audioFadeInOut: boolean;
+  // Optional SFX Cue Layer
+  sfxId: SfxId | 'none';
+  sfxTiming: 'intro' | 'mid' | 'outro';
+  sfxVolume: number;
+}
+
+export type SfxCategory =
+  | 'ui'
+  | 'transitions'
+  | 'chimes'
+  | 'impacts'
+  | 'musical'
+  | 'foley';
+
+export type SfxId =
+  | 'ui-soft-pop'
+  | 'ui-glass-tap'
+  | 'ui-toggle-switch'
+  | 'ui-typing-burst'
+  | 'whoosh-air'
+  | 'whoosh-indigo-riser'
+  | 'whoosh-reverse-swell'
+  | 'whoosh-fast-swipe'
+  | 'chime-mint-spark'
+  | 'chime-okarina-logo'
+  | 'chime-glass-bell'
+  | 'chime-success-chord'
+  | 'impact-sub-boom'
+  | 'impact-punch-hit'
+  | 'impact-cine-slam'
+  | 'impact-glitch-blip'
+  | 'ocarina-call-high'
+  | 'ocarina-breath-swell'
+  | 'marimba-ping'
+  | 'arp-flourish'
+  | 'foley-camera-shutter'
+  | 'foley-vinyl-drop'
+  | 'foley-water-drop'
+  | 'foley-thunder-rumble';
+
+export interface SfxMeta {
+  id: SfxId;
+  title: string;
+  category: SfxCategory;
+  description: string;
+  durationLabel: string;
+  license: string;
 }
 
 export interface SavedVideoDesign extends VideoConfig {

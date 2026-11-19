@@ -109,6 +109,106 @@ async function startServer() {
     }
   });
 
+  // Search Internet Archive strictly for Public Domain / CC0 non-copyrighted audio files
+  app.get('/api/cc0-search', async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : 'ambient';
+    const sanitized = q.replace(/[^a-zA-Z0-9\s\-_]/g, ' ').trim() || 'ambient';
+
+    const queryStr = `mediatype:audio AND (licenseurl:*publicdomain* OR licenseurl:*zero*) AND item_size:[20000 TO 22000000] AND (${sanitized})`;
+    const searchUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(
+      queryStr
+    )}&fl[]=identifier,title,creator,licenseurl&sort[]=downloads+desc&rows=12&output=json`;
+
+    try {
+      const searchRes = await fetch(searchUrl, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!searchRes.ok) {
+        res.status(502).json({ error: 'Public audio catalog unavailable.' });
+        return;
+      }
+
+      const data = (await searchRes.json()) as {
+        response?: {
+          docs?: {
+            identifier: string;
+            title?: string;
+            creator?: string | string[];
+            licenseurl?: string;
+          }[];
+        };
+      };
+
+      const docs = data.response?.docs || [];
+      const resolved = await Promise.all(
+        docs.slice(0, 10).map(async (doc) => {
+          try {
+            const metaRes = await fetch(
+              `https://archive.org/metadata/${encodeURIComponent(doc.identifier)}/files`,
+              { signal: AbortSignal.timeout(5000) }
+            );
+            if (!metaRes.ok) return null;
+            const metaJson = (await metaRes.json()) as {
+              result?: {
+                name?: string;
+                size?: string;
+                length?: string;
+                format?: string;
+              }[];
+            };
+            const files = metaJson.result || [];
+            const audioFile = files.find((f) => {
+              const name = (f.name || '').toLowerCase();
+              const size = Number(f.size || 0);
+              const isSupported =
+                name.endsWith('.mp3') ||
+                name.endsWith('.ogg') ||
+                name.endsWith('.wav');
+              return isSupported && size > 10000 && size <= 18 * 1024 * 1024;
+            });
+
+            if (!audioFile || !audioFile.name) return null;
+
+            const creator = Array.isArray(doc.creator)
+              ? doc.creator[0]
+              : doc.creator || 'Public Domain';
+            const sizeMb = (Number(audioFile.size || 0) / (1024 * 1024)).toFixed(1);
+            const rawLen = audioFile.length ? Number(audioFile.length) : 0;
+            const lengthLabel =
+              rawLen > 0
+                ? `${Math.floor(rawLen / 60)}:${String(
+                    Math.round(rawLen % 60)
+                  ).padStart(2, '0')}`
+                : `${sizeMb} MB`;
+
+            return {
+              id: doc.identifier,
+              title: doc.title || doc.identifier,
+              creator,
+              license: doc.licenseurl?.includes('zero')
+                ? 'CC0 1.0'
+                : 'Public Domain',
+              lengthLabel,
+              audioUrl: `https://archive.org/download/${encodeURIComponent(
+                doc.identifier
+              )}/${encodeURIComponent(audioFile.name)}`,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      res.json({
+        tracks: resolved.filter((item): item is NonNullable<typeof item> => item !== null),
+      });
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to search CC0 audio.';
+      res.status(502).json({ error: msg });
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

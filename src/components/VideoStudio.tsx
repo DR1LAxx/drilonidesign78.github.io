@@ -13,19 +13,25 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Search,
+  Sparkles,
   Trash2,
   Upload,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import {
+  SFX_CATALOG,
   STUDIO_AUDIO_TRACKS,
   VIDEO_FORMAT_META,
   VIDEO_TEMPLATES,
 } from '../data/brandPresets';
 import {
+  AudioCategory,
   AudioSourceMode,
   BackdropStyle,
+  CC0WebTrack,
+  SfxId,
   VideoConfig,
   VideoFormat,
 } from '../types/brand';
@@ -33,8 +39,10 @@ import {
   audioBufferToWavBlob,
   fetchAndDecodeAudioUrl,
   renderStudioAudioTrack,
+  searchCC0AudioLibrary,
 } from '../utils/audioEngine';
 import { downloadDataUrl } from '../utils/canvasRenderers';
+import { renderSoundEffect } from '../utils/sfxEngine';
 import {
   pickSupportedVideoMimeType,
   renderVideoFrameToCanvas,
@@ -46,6 +54,7 @@ interface VideoStudioProps {
   onChange: (next: VideoConfig) => void;
   onSaveDesign: (config: VideoConfig) => void;
   exportTrigger: number;
+  onOpenSfxStudio?: () => void;
 }
 
 const VIDEO_THEMES = [
@@ -135,6 +144,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   onChange,
   onSaveDesign,
   exportTrigger,
+  onOpenSfxStudio,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -152,6 +162,16 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const [audioError, setAudioError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState(config.audioUrl || '');
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [sfxBuffer, setSfxBuffer] = useState<AudioBuffer | null>(null);
+
+  // Built-in library filters & CC0 web catalog search
+  const [studioCategory, setStudioCategory] = useState<'all' | AudioCategory>('all');
+  const [studioSearch, setStudioSearch] = useState('');
+  const [cc0Query, setCc0Query] = useState('ambient');
+  const [cc0Results, setCc0Results] = useState<CC0WebTrack[]>([]);
+  const [cc0Searching, setCc0Searching] = useState(false);
+  const [cc0SearchError, setCc0SearchError] = useState<string | null>(null);
+  const [selectedCc0Track, setSelectedCc0Track] = useState<CC0WebTrack | null>(null);
 
   // Video export state
   const [isExporting, setIsExporting] = useState(false);
@@ -163,6 +183,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
+  const previewSfxSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const previewSfxGainRef = useRef<GainNode | null>(null);
   const previewAnalyserRef = useRef<AnalyserNode | null>(null);
   const freqBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -226,6 +248,43 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     };
   }, [config.audioMode, config.studioTrackId]);
 
+  // Synthesize optional SFX cue layer when selected
+  useEffect(() => {
+    const activeSfx = config.sfxId ?? 'none';
+    if (activeSfx === 'none') {
+      setSfxBuffer(null);
+      return;
+    }
+    let cancelled = false;
+    renderSoundEffect(activeSfx)
+      .then((buf) => {
+        if (!cancelled) {
+          setSfxBuffer(buf);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSfxBuffer(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config.sfxId]);
+
+  const getSfxCueStartSec = useCallback(
+    (
+      sfxBuf: AudioBuffer,
+      durationSec: number,
+      timing: 'intro' | 'mid' | 'outro'
+    ) => {
+      if (timing === 'intro') return 0;
+      if (timing === 'mid') return durationSec * 0.5;
+      return Math.max(0, durationSec - Math.min(2, sfxBuf.duration));
+    },
+    []
+  );
+
   const stopPreviewAudio = useCallback(() => {
     if (previewSourceRef.current) {
       try {
@@ -240,6 +299,19 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       previewGainRef.current.disconnect();
       previewGainRef.current = null;
     }
+    if (previewSfxSourceRef.current) {
+      try {
+        previewSfxSourceRef.current.stop();
+        previewSfxSourceRef.current.disconnect();
+      } catch {
+        // already stopped
+      }
+      previewSfxSourceRef.current = null;
+    }
+    if (previewSfxGainRef.current) {
+      previewSfxGainRef.current.disconnect();
+      previewSfxGainRef.current = null;
+    }
     if (previewAnalyserRef.current) {
       previewAnalyserRef.current.disconnect();
       previewAnalyserRef.current = null;
@@ -248,15 +320,25 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
 
   // Live volume adjustment while playing
   useEffect(() => {
-    if (previewGainRef.current && audioCtxRef.current) {
-      const target = isMuted ? 0 : config.audioVolume;
-      previewGainRef.current.gain.setTargetAtTime(
-        target,
-        audioCtxRef.current.currentTime,
-        0.03
-      );
+    if (audioCtxRef.current) {
+      if (previewGainRef.current) {
+        const target = isMuted ? 0 : config.audioVolume;
+        previewGainRef.current.gain.setTargetAtTime(
+          target,
+          audioCtxRef.current.currentTime,
+          0.03
+        );
+      }
+      if (previewSfxGainRef.current) {
+        const sfxTarget = isMuted ? 0 : (config.sfxVolume ?? 0.75);
+        previewSfxGainRef.current.gain.setTargetAtTime(
+          sfxTarget,
+          audioCtxRef.current.currentTime,
+          0.03
+        );
+      }
     }
-  }, [isMuted, config.audioVolume]);
+  }, [isMuted, config.audioVolume, config.sfxVolume]);
 
   // Render static frame whenever paused & config changes
   useEffect(() => {
@@ -281,39 +363,75 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
   const startPreviewAudioAt = useCallback(
     (timelineOffsetSec: number) => {
       stopPreviewAudio();
-      if (config.audioMode === 'none' || !audioBuffer) return;
+      const hasMusic = config.audioMode !== 'none' && audioBuffer !== null;
+      const activeSfx = config.sfxId ?? 'none';
+      const hasSfx = activeSfx !== 'none' && sfxBuffer !== null;
+      if (!hasMusic && !hasSfx) return;
 
       const ctx = getAudioContext();
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.loop = true;
-
-      const gain = ctx.createGain();
-      gain.gain.value = isMuted ? 0 : config.audioVolume;
-
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.78;
       freqBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
-
-      source.connect(gain);
-      gain.connect(analyser);
       analyser.connect(ctx.destination);
-
-      const audioOffset =
-        (config.audioStartSec + timelineOffsetSec) % audioBuffer.duration;
-      source.start(0, Math.max(0, audioOffset));
-
-      previewSourceRef.current = source;
-      previewGainRef.current = gain;
       previewAnalyserRef.current = analyser;
+
+      if (hasMusic && audioBuffer) {
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.loop = true;
+
+        const gain = ctx.createGain();
+        gain.gain.value = isMuted ? 0 : config.audioVolume;
+
+        source.connect(gain);
+        gain.connect(analyser);
+
+        const audioOffset =
+          (config.audioStartSec + timelineOffsetSec) % audioBuffer.duration;
+        source.start(0, Math.max(0, audioOffset));
+
+        previewSourceRef.current = source;
+        previewGainRef.current = gain;
+      }
+
+      if (hasSfx && sfxBuffer) {
+        const cueSec = getSfxCueStartSec(
+          sfxBuffer,
+          config.durationSec,
+          config.sfxTiming ?? 'intro'
+        );
+        if (timelineOffsetSec < cueSec + sfxBuffer.duration) {
+          const sfxSource = ctx.createBufferSource();
+          sfxSource.buffer = sfxBuffer;
+
+          const sfxGain = ctx.createGain();
+          sfxGain.gain.value = isMuted ? 0 : (config.sfxVolume ?? 0.75);
+
+          sfxSource.connect(sfxGain);
+          sfxGain.connect(analyser);
+
+          const delaySec = Math.max(0, cueSec - timelineOffsetSec);
+          const bufferOffset = Math.max(0, timelineOffsetSec - cueSec);
+          sfxSource.start(ctx.currentTime + delaySec, bufferOffset);
+
+          previewSfxSourceRef.current = sfxSource;
+          previewSfxGainRef.current = sfxGain;
+        }
+      }
     },
     [
       audioBuffer,
+      sfxBuffer,
       config.audioMode,
       config.audioStartSec,
       config.audioVolume,
+      config.durationSec,
+      config.sfxId,
+      config.sfxTiming,
+      config.sfxVolume,
       getAudioContext,
+      getSfxCueStartSec,
       isMuted,
       stopPreviewAudio,
     ]
@@ -448,6 +566,50 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     }
   };
 
+  const handleSearchCC0 = async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? cc0Query).trim() || 'ambient';
+    if (overrideQuery !== undefined) setCc0Query(overrideQuery);
+    setCc0Searching(true);
+    setCc0SearchError(null);
+    try {
+      const tracks = await searchCC0AudioLibrary(q);
+      setCc0Results(tracks);
+      if (tracks.length === 0) {
+        setCc0SearchError('No CC0 tracks matched that search. Try "piano", "ambient", or "rain".');
+      }
+    } catch (err) {
+      setCc0SearchError(
+        err instanceof Error ? err.message : 'Unable to reach public CC0 catalog.'
+      );
+    } finally {
+      setCc0Searching(false);
+    }
+  };
+
+  const handleSelectCC0Track = async (track: CC0WebTrack) => {
+    setIsPlaying(false);
+    setAudioLoading(true);
+    setAudioError(null);
+    try {
+      const ctx = getAudioContext();
+      const decoded = await fetchAndDecodeAudioUrl(track.audioUrl, ctx);
+      setAudioBuffer(decoded);
+      setSelectedCc0Track(track);
+      update({
+        audioMode: 'cc0web',
+        audioUrl: track.audioUrl,
+        uploadedAudioName: track.title,
+        audioStartSec: 0,
+      });
+    } catch (err) {
+      setAudioError(
+        err instanceof Error ? err.message : 'Could not load that CC0 audio track.'
+      );
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
   const handleDownloadWavTrack = () => {
     if (!audioBuffer) return;
     const wav = audioBufferToWavBlob(audioBuffer);
@@ -482,11 +644,24 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       const ctx = getAudioContext();
       const mediaDest = ctx.createMediaStreamDestination();
       let exportSource: AudioBufferSourceNode | null = null;
+      let sfxExportSource: AudioBufferSourceNode | null = null;
       let exportAnalyser: AnalyserNode | null = null;
       let exportFreq: Uint8Array<ArrayBuffer> | null = null;
 
-      const hasAudio = config.audioMode !== 'none' && audioBuffer !== null;
-      if (hasAudio && audioBuffer) {
+      const hasMusic = config.audioMode !== 'none' && audioBuffer !== null;
+      const activeSfx = config.sfxId ?? 'none';
+      const hasSfx = activeSfx !== 'none' && sfxBuffer !== null;
+      const hasAudio = hasMusic || hasSfx;
+
+      if (hasAudio) {
+        exportAnalyser = ctx.createAnalyser();
+        exportAnalyser.fftSize = 128;
+        exportAnalyser.smoothingTimeConstant = 0.78;
+        exportFreq = new Uint8Array(exportAnalyser.frequencyBinCount);
+        exportAnalyser.connect(mediaDest);
+      }
+
+      if (hasMusic && audioBuffer && exportAnalyser) {
         exportSource = ctx.createBufferSource();
         exportSource.buffer = audioBuffer;
         exportSource.loop = true;
@@ -503,14 +678,29 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           gainNode.gain.setValueAtTime(vol, now);
         }
 
-        exportAnalyser = ctx.createAnalyser();
-        exportAnalyser.fftSize = 128;
-        exportAnalyser.smoothingTimeConstant = 0.78;
-        exportFreq = new Uint8Array(exportAnalyser.frequencyBinCount);
-
         exportSource.connect(gainNode);
         gainNode.connect(exportAnalyser);
-        exportAnalyser.connect(mediaDest);
+      }
+
+      let sfxCueSec = 0;
+      if (hasSfx && sfxBuffer && exportAnalyser) {
+        sfxExportSource = ctx.createBufferSource();
+        sfxExportSource.buffer = sfxBuffer;
+
+        const sfxGainNode = ctx.createGain();
+        sfxGainNode.gain.setValueAtTime(
+          config.sfxVolume ?? 0.75,
+          ctx.currentTime
+        );
+
+        sfxExportSource.connect(sfxGainNode);
+        sfxGainNode.connect(exportAnalyser);
+
+        sfxCueSec = getSfxCueStartSec(
+          sfxBuffer,
+          config.durationSec,
+          config.sfxTiming ?? 'intro'
+        );
       }
 
       // Draw frame 0 before capturing stream
@@ -547,6 +737,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
       if (exportSource && audioBuffer) {
         const offset = config.audioStartSec % audioBuffer.duration;
         exportSource.start(0, Math.max(0, offset));
+      }
+      if (sfxExportSource) {
+        sfxExportSource.start(ctx.currentTime + sfxCueSec);
       }
 
       const startPerf = performance.now();
@@ -588,6 +781,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           // ignore
         }
       }
+      if (sfxExportSource) {
+        try {
+          sfxExportSource.stop();
+          sfxExportSource.disconnect();
+        } catch {
+          // ignore
+        }
+      }
 
       if (recorder.state !== 'inactive') {
         recorder.stop();
@@ -623,9 +824,11 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     }
   }, [
     audioBuffer,
+    sfxBuffer,
     config,
     designName,
     getAudioContext,
+    getSfxCueStartSec,
     isExporting,
     loadedImage,
     stopPreviewAudio,
@@ -646,8 +849,25 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
     setTimeout(() => setJustSaved(false), 1800);
   };
 
+  const handleTestSfxCue = async () => {
+    const activeSfx = config.sfxId ?? 'none';
+    if (activeSfx === 'none') return;
+    const buf = sfxBuffer || (await renderSoundEffect(activeSfx));
+    const ctx = getAudioContext();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = config.sfxVolume ?? 0.75;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(0);
+  };
+
   const activeTrackMeta = STUDIO_AUDIO_TRACKS.find(
     (t) => t.id === config.studioTrackId
+  );
+  const activeSfxMeta = SFX_CATALOG.find(
+    (s) => s.id === (config.sfxId ?? 'none')
   );
 
   return (
@@ -856,12 +1076,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               <span aria-hidden="true">·</span>
               <span>
                 {config.audioMode === 'none'
-                  ? 'Silent clip'
+                  ? 'Silent track'
                   : config.audioMode === 'studio'
                   ? `Audio: ${activeTrackMeta?.title || 'Studio Track'}`
+                  : config.audioMode === 'cc0web'
+                  ? `Audio: ${selectedCc0Track?.title || config.uploadedAudioName || 'CC0 Web Track'}`
                   : config.audioMode === 'upload'
                   ? `Audio: ${config.uploadedAudioName || 'Uploaded file'}`
                   : 'Audio: External URL'}
+                {activeSfxMeta ? ` + SFX: ${activeSfxMeta.title}` : ''}
               </span>
             </p>
           </div>
@@ -1047,10 +1270,11 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
           </div>
 
           {/* Audio Source Mode Switcher */}
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-lg">
             {(
               [
                 { id: 'studio', label: 'Studio' },
+                { id: 'cc0web', label: 'CC0 Web' },
                 { id: 'upload', label: 'Upload' },
                 { id: 'url', label: 'URL' },
                 { id: 'none', label: 'Silent' },
@@ -1063,8 +1287,11 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
                   setIsPlaying(false);
                   setAudioError(null);
                   update({ audioMode: mode.id });
+                  if (mode.id === 'cc0web' && cc0Results.length === 0 && !cc0Searching) {
+                    handleSearchCC0('ambient');
+                  }
                 }}
-                className={`py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                className={`py-1.5 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap ${
                   config.audioMode === mode.id
                     ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1075,56 +1302,222 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
             ))}
           </div>
 
-          {/* Built-in Studio Tracks */}
+          {/* Built-in 18-Track CC0 Studio Library */}
           {config.audioMode === 'studio' && (
-            <div className="space-y-1.5">
-              {STUDIO_AUDIO_TRACKS.map((track) => {
-                const active = config.studioTrackId === track.id;
-                return (
+            <div className="space-y-2.5">
+              {/* Category filter & quick search */}
+              <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+                {(
+                  [
+                    { id: 'all', label: 'All (18)' },
+                    { id: 'music', label: 'Music' },
+                    { id: 'ambient', label: 'Ambient' },
+                    { id: 'beats', label: 'Beats' },
+                    { id: 'soundscapes', label: 'FX' },
+                  ] as { id: 'all' | AudioCategory; label: string }[]
+                ).map((cat) => (
                   <button
-                    key={track.id}
+                    key={cat.id}
                     type="button"
-                    onClick={() => {
-                      setIsPlaying(false);
-                      update({ studioTrackId: track.id, audioStartSec: 0 });
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
-                      active
-                        ? 'bg-[#0B1120] text-white border-[#0B1120]'
-                        : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                    onClick={() => setStudioCategory(cat.id)}
+                    className={`flex-1 py-1 px-1.5 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                      studioCategory === cat.id
+                        ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold">{track.title}</span>
-                      <span
-                        className={`text-[10px] font-mono-tabular ${
-                          active ? 'text-[#18D5A8]' : 'text-slate-400'
-                        }`}
-                      >
-                        {track.bpm} BPM · {track.keyLabel}
-                      </span>
-                    </div>
-                    <p
-                      className={`text-[11px] mt-0.5 ${
-                        active ? 'text-slate-300' : 'text-slate-500'
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={studioSearch}
+                  onChange={(e) => setStudioSearch(e.target.value)}
+                  placeholder="Filter tracks (e.g. rain, lo-fi, flute)..."
+                  aria-label="Filter studio tracks"
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-0.5">
+                {STUDIO_AUDIO_TRACKS.filter((t) => {
+                  if (studioCategory !== 'all' && t.category !== studioCategory) {
+                    return false;
+                  }
+                  if (studioSearch.trim()) {
+                    const q = studioSearch.toLowerCase();
+                    return (
+                      t.title.toLowerCase().includes(q) ||
+                      t.vibe.toLowerCase().includes(q) ||
+                      t.category.toLowerCase().includes(q)
+                    );
+                  }
+                  return true;
+                }).map((track) => {
+                  const active = config.studioTrackId === track.id;
+                  return (
+                    <button
+                      key={track.id}
+                      type="button"
+                      onClick={() => {
+                        setIsPlaying(false);
+                        update({ studioTrackId: track.id, audioStartSec: 0 });
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
+                        active
+                          ? 'bg-[#0B1120] text-white border-[#0B1120]'
+                          : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      {track.vibe}
-                    </p>
-                  </button>
-                );
-              })}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold truncate">
+                          {track.title}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono-tabular shrink-0 ${
+                            active ? 'text-[#18D5A8]' : 'text-slate-400'
+                          }`}
+                        >
+                          {track.bpm} BPM · {track.keyLabel}
+                        </span>
+                      </div>
+                      <p
+                        className={`text-[11px] mt-0.5 leading-snug ${
+                          active ? 'text-slate-300' : 'text-slate-500'
+                        }`}
+                      >
+                        {track.vibe}
+                      </p>
+                      <div
+                        className={`text-[10px] mt-1 ${
+                          active ? 'text-slate-400' : 'text-slate-400'
+                        }`}
+                      >
+                        {track.category} · {track.license}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
               {audioBuffer && (
                 <button
                   type="button"
                   onClick={handleDownloadWavTrack}
-                  className="w-full mt-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Active Track (.wav)
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Public Domain / CC0 Web Catalog (Internet Archive) */}
+          {config.audioMode === 'cc0web' && (
+            <div className="space-y-2.5">
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={cc0Query}
+                  onChange={(e) => setCc0Query(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSearchCC0();
+                  }}
+                  placeholder="Search free CC0 audio..."
+                  aria-label="Search CC0 public domain audio"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+                />
+                <button
+                  type="button"
+                  disabled={cc0Searching}
+                  onClick={() => handleSearchCC0()}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors shrink-0 disabled:opacity-50"
+                >
+                  {cc0Searching ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Search className="w-3.5 h-3.5" />
+                  )}
+                  Search
+                </button>
+              </div>
+
+              {/* Quick topic picks */}
+              <div className="flex flex-wrap gap-1">
+                {['ambient', 'piano', 'synth', 'rain', 'acoustic', 'lofi'].map(
+                  (tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleSearchCC0(tag)}
+                      className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {cc0SearchError && (
+                <div className="p-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+                  {cc0SearchError}
+                </div>
+              )}
+
+              <div className="max-h-60 overflow-y-auto space-y-1.5 pr-0.5">
+                {cc0Searching ? (
+                  <div className="py-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#2939F0]" />
+                    Searching CC0 & Public Domain catalog...
+                  </div>
+                ) : (
+                  cc0Results.map((track) => {
+                    const active = selectedCc0Track?.id === track.id;
+                    return (
+                      <button
+                        key={track.id}
+                        type="button"
+                        disabled={audioLoading}
+                        onClick={() => handleSelectCC0Track(track)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
+                          active
+                            ? 'bg-[#0B1120] text-white border-[#0B1120]'
+                            : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold truncate">
+                            {track.title}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono-tabular shrink-0 ${
+                              active ? 'text-[#18D5A8]' : 'text-slate-400'
+                            }`}
+                          >
+                            {track.lengthLabel}
+                          </span>
+                        </div>
+                        <div
+                          className={`text-[11px] mt-0.5 truncate ${
+                            active ? 'text-slate-300' : 'text-slate-500'
+                          }`}
+                        >
+                          {track.creator} · {track.license}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 leading-snug">
+                Filtered strictly to CC0 1.0 & Public Domain recordings via
+                Internet Archive.
+              </p>
             </div>
           )}
 
@@ -1263,6 +1656,97 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({
               </div>
             </div>
           )}
+
+          {/* SFX Cue Overlay */}
+          <div className="pt-3 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#18D5A8]" />
+                SFX Cue Layer (CC0)
+              </span>
+              {onOpenSfxStudio && (
+                <button
+                  type="button"
+                  onClick={onOpenSfxStudio}
+                  className="text-[11px] font-medium text-[#2939F0] hover:underline"
+                >
+                  Open Sound Effects
+                </button>
+              )}
+            </div>
+
+            <select
+              value={config.sfxId ?? 'none'}
+              onChange={(e) =>
+                update({ sfxId: e.target.value as SfxId | 'none' })
+              }
+              aria-label="Select sound effect cue"
+              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2939F0]"
+            >
+              <option value="none">No SFX Cue</option>
+              {SFX_CATALOG.map((sfx) => (
+                <option key={sfx.id} value={sfx.id}>
+                  {sfx.title} ({sfx.durationLabel})
+                </option>
+              ))}
+            </select>
+
+            {(config.sfxId ?? 'none') !== 'none' && (
+              <div className="space-y-2.5 pt-1">
+                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+                  {(
+                    [
+                      { id: 'intro', label: 'Intro (0s)' },
+                      { id: 'mid', label: 'Midpoint' },
+                      { id: 'outro', label: 'Outro' },
+                    ] as const
+                  ).map((pos) => (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => update({ sfxTiming: pos.id })}
+                      className={`py-1 text-[11px] font-medium rounded-md transition-colors ${
+                        (config.sfxTiming ?? 'intro') === pos.id
+                          ? 'bg-white text-[#0B1120] shadow-xs font-semibold'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {pos.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="font-medium text-slate-600">SFX Level</span>
+                    <span className="font-mono-tabular text-slate-400">
+                      {Math.round((config.sfxVolume ?? 0.75) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.02}
+                    value={config.sfxVolume ?? 0.75}
+                    onChange={(e) =>
+                      update({ sfxVolume: parseFloat(e.target.value) })
+                    }
+                    className="w-full"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestSfxCue}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Play className="w-3 h-3" />
+                  Test SFX Cue
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Video Copy */}

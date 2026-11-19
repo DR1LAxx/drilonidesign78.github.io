@@ -4,6 +4,7 @@ import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
 import { InstagramStudio } from './components/InstagramStudio';
 import { OkarinaMark } from './components/OkarinaMark';
+import { SoundEffectsStudio } from './components/SoundEffectsStudio';
 import { VideoStudio } from './components/VideoStudio';
 import {
   DEFAULT_BRAND_CONFIG,
@@ -16,6 +17,7 @@ import {
   SavedBrandVersion,
   SavedInstagramDesign,
   SavedVideoDesign,
+  SfxId,
   VideoConfig,
   WorkspaceTab,
 } from './types/brand';
@@ -143,7 +145,19 @@ export function App() {
   };
 
   const handleEditVideoDesign = (design: VideoConfig) => {
-    setVideoConfig(design);
+    setVideoConfig({ ...DEFAULT_VIDEO_CONFIG, ...design });
+    setActiveTab('video');
+  };
+
+  const handleSendSfxToVideo = (
+    sfxId: SfxId,
+    sfxTiming: 'intro' | 'mid' | 'outro'
+  ) => {
+    setVideoConfig((prev) => ({
+      ...prev,
+      sfxId,
+      sfxTiming,
+    }));
     setActiveTab('video');
   };
 
@@ -154,6 +168,8 @@ export function App() {
       setIgExportTrigger((n) => n + 1);
     } else if (activeTab === 'video') {
       setVideoExportTrigger((n) => n + 1);
+    } else if (activeTab === 'sfx') {
+      setActiveTab('video');
     } else {
       setActiveTab('instagram');
     }
@@ -163,6 +179,7 @@ export function App() {
     { id: 'editor', label: 'Brand Editor' },
     { id: 'instagram', label: 'Instagram Studio' },
     { id: 'video', label: 'Video Studio' },
+    { id: 'sfx', label: 'Sound Effects' },
     { id: 'vault', label: 'Asset Vault' },
   ];
 
@@ -230,6 +247,8 @@ export function App() {
               ? 'New Instagram Post'
               : activeTab === 'video'
               ? 'Export Video'
+              : activeTab === 'sfx'
+              ? 'Open Video Studio'
               : 'Export PNG'}
           </button>
         </div>
@@ -261,6 +280,14 @@ export function App() {
             onChange={setVideoConfig}
             onSaveDesign={handleSaveVideoDesign}
             exportTrigger={videoExportTrigger}
+            onOpenSfxStudio={() => setActiveTab('sfx')}
+          />
+        )}
+
+        {activeTab === 'sfx' && (
+          <SoundEffectsStudio
+            activeVideoSfxId={videoConfig.sfxId ?? 'none'}
+            onSendToVideo={handleSendSfxToVideo}
           />
         )}
 
