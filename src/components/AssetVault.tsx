@@ -10,6 +10,7 @@ import {
   BRAND_FORMAT_META,
   INSTAGRAM_FORMAT_META,
   ORIGINAL_ASSETS,
+  VIDEO_FORMAT_META,
 } from '../data/brandPresets';
 import {
   BrandConfig,
@@ -17,16 +18,21 @@ import {
   OriginalAssetItem,
   SavedBrandVersion,
   SavedInstagramDesign,
+  SavedVideoDesign,
+  VideoConfig,
 } from '../types/brand';
 import { OkarinaMark } from './OkarinaMark';
 
 interface AssetVaultProps {
   savedBrandVersions: SavedBrandVersion[];
   savedInstagramDesigns: SavedInstagramDesign[];
+  savedVideoDesigns: SavedVideoDesign[];
   onEditBrandPreset: (preset: Partial<BrandConfig>) => void;
   onEditInstagramDesign: (design: InstagramConfig) => void;
+  onEditVideoDesign: (design: VideoConfig) => void;
   onDeleteBrandVersion: (id: string) => void;
   onDeleteInstagramDesign: (id: string) => void;
+  onDeleteVideoDesign: (id: string) => void;
 }
 
 type VaultFilter =
@@ -40,10 +46,13 @@ type VaultFilter =
 export const AssetVault: React.FC<AssetVaultProps> = ({
   savedBrandVersions,
   savedInstagramDesigns,
+  savedVideoDesigns,
   onEditBrandPreset,
   onEditInstagramDesign,
+  onEditVideoDesign,
   onDeleteBrandVersion,
   onDeleteInstagramDesign,
+  onDeleteVideoDesign,
 }) => {
   const [filter, setFilter] = useState<VaultFilter>('all');
   const [selectedAsset, setSelectedAsset] = useState<OriginalAssetItem | null>(
@@ -53,7 +62,10 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
     'checker'
   );
 
-  const savedTotal = savedBrandVersions.length + savedInstagramDesigns.length;
+  const savedTotal =
+    savedBrandVersions.length +
+    savedInstagramDesigns.length +
+    savedVideoDesigns.length;
 
   const visibleOriginals =
     filter === 'all'
@@ -259,6 +271,72 @@ export const AssetVault: React.FC<AssetVaultProps> = ({
                                 type="button"
                                 onClick={() => onDeleteInstagramDesign(des.id)}
                                 aria-label={`Delete ${des.name}`}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {savedVideoDesigns.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-[#0B1120] mb-4">
+                    Saved Video Projects ({savedVideoDesigns.length})
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {savedVideoDesigns.map((vid) => {
+                      const fmt = VIDEO_FORMAT_META[vid.format];
+                      return (
+                        <div
+                          key={vid.id}
+                          className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col"
+                        >
+                          <div
+                            className="h-44 p-5 flex flex-col justify-between"
+                            style={{
+                              backgroundColor: vid.bgColor,
+                              color: vid.textColor,
+                            }}
+                          >
+                            <span
+                              className="text-[11px] font-mono-tabular opacity-85"
+                              style={{ color: vid.accentColor }}
+                            >
+                              {vid.eyebrow || fmt.label} · {vid.durationSec}s
+                            </span>
+                            <p className="font-display text-lg font-semibold leading-snug line-clamp-2">
+                              {vid.headline}
+                            </p>
+                            <span className="text-xs opacity-70">
+                              {vid.footerHandle} · {fmt.ratioLabel}
+                            </span>
+                          </div>
+                          <div className="p-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-semibold text-[#0B1120] truncate">
+                                {vid.name}
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {fmt.label} · {vid.savedAt}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => onEditVideoDesign(vid)}
+                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors"
+                              >
+                                Open
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteVideoDesign(vid.id)}
+                                aria-label={`Delete ${vid.name}`}
                                 className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />

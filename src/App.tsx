@@ -4,20 +4,25 @@ import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
 import { InstagramStudio } from './components/InstagramStudio';
 import { OkarinaMark } from './components/OkarinaMark';
+import { VideoStudio } from './components/VideoStudio';
 import {
   DEFAULT_BRAND_CONFIG,
   DEFAULT_INSTAGRAM_CONFIG,
+  DEFAULT_VIDEO_CONFIG,
 } from './data/brandPresets';
 import {
   BrandConfig,
   InstagramConfig,
   SavedBrandVersion,
   SavedInstagramDesign,
+  SavedVideoDesign,
+  VideoConfig,
   WorkspaceTab,
 } from './types/brand';
 
 const BRAND_STORAGE_KEY = 'okarina_saved_brand_versions_v1';
 const IG_STORAGE_KEY = 'okarina_saved_ig_designs_v1';
+const VIDEO_STORAGE_KEY = 'okarina_saved_video_designs_v1';
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -36,15 +41,23 @@ export function App() {
   const [instagramConfig, setInstagramConfig] = useState<InstagramConfig>(
     DEFAULT_INSTAGRAM_CONFIG
   );
+  const [videoConfig, setVideoConfig] = useState<VideoConfig>(
+    DEFAULT_VIDEO_CONFIG
+  );
+
   const [savedBrandVersions, setSavedBrandVersions] = useState<
     SavedBrandVersion[]
   >(() => loadFromStorage<SavedBrandVersion[]>(BRAND_STORAGE_KEY, []));
   const [savedInstagramDesigns, setSavedInstagramDesigns] = useState<
     SavedInstagramDesign[]
   >(() => loadFromStorage<SavedInstagramDesign[]>(IG_STORAGE_KEY, []));
+  const [savedVideoDesigns, setSavedVideoDesigns] = useState<
+    SavedVideoDesign[]
+  >(() => loadFromStorage<SavedVideoDesign[]>(VIDEO_STORAGE_KEY, []));
 
   const [brandExportTrigger, setBrandExportTrigger] = useState(0);
   const [igExportTrigger, setIgExportTrigger] = useState(0);
+  const [videoExportTrigger, setVideoExportTrigger] = useState(0);
 
   useEffect(() => {
     try {
@@ -68,6 +81,17 @@ export function App() {
     }
   }, [savedInstagramDesigns]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        VIDEO_STORAGE_KEY,
+        JSON.stringify(savedVideoDesigns)
+      );
+    } catch {
+      // Ignore quota errors
+    }
+  }, [savedVideoDesigns]);
+
   const handleSaveBrandVersion = (cfg: BrandConfig) => {
     const entry: SavedBrandVersion = {
       ...cfg,
@@ -81,7 +105,6 @@ export function App() {
   };
 
   const handleSaveInstagramDesign = (cfg: InstagramConfig) => {
-    // Strip very large photo data URLs only if needed; keep normally for reload
     const entry: SavedInstagramDesign = {
       ...cfg,
       id: `ig-${Date.now()}`,
@@ -91,6 +114,18 @@ export function App() {
       }),
     };
     setSavedInstagramDesigns((prev) => [entry, ...prev]);
+  };
+
+  const handleSaveVideoDesign = (cfg: VideoConfig) => {
+    const entry: SavedVideoDesign = {
+      ...cfg,
+      id: `vid-${Date.now()}`,
+      savedAt: new Date().toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }),
+    };
+    setSavedVideoDesigns((prev) => [entry, ...prev]);
   };
 
   const handleEditBrandPreset = (preset: Partial<BrandConfig>) => {
@@ -107,11 +142,18 @@ export function App() {
     setActiveTab('instagram');
   };
 
+  const handleEditVideoDesign = (design: VideoConfig) => {
+    setVideoConfig(design);
+    setActiveTab('video');
+  };
+
   const handlePrimaryAction = () => {
     if (activeTab === 'editor') {
       setBrandExportTrigger((n) => n + 1);
     } else if (activeTab === 'instagram') {
       setIgExportTrigger((n) => n + 1);
+    } else if (activeTab === 'video') {
+      setVideoExportTrigger((n) => n + 1);
     } else {
       setActiveTab('instagram');
     }
@@ -120,6 +162,7 @@ export function App() {
   const navItems: { id: WorkspaceTab; label: string }[] = [
     { id: 'editor', label: 'Brand Editor' },
     { id: 'instagram', label: 'Instagram Studio' },
+    { id: 'video', label: 'Video Studio' },
     { id: 'vault', label: 'Asset Vault' },
   ];
 
@@ -183,7 +226,11 @@ export function App() {
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
-            {activeTab === 'vault' ? 'New Instagram Post' : 'Export PNG'}
+            {activeTab === 'vault'
+              ? 'New Instagram Post'
+              : activeTab === 'video'
+              ? 'Export Video'
+              : 'Export PNG'}
           </button>
         </div>
       </header>
@@ -208,12 +255,23 @@ export function App() {
           />
         )}
 
+        {activeTab === 'video' && (
+          <VideoStudio
+            config={videoConfig}
+            onChange={setVideoConfig}
+            onSaveDesign={handleSaveVideoDesign}
+            exportTrigger={videoExportTrigger}
+          />
+        )}
+
         {activeTab === 'vault' && (
           <AssetVault
             savedBrandVersions={savedBrandVersions}
             savedInstagramDesigns={savedInstagramDesigns}
+            savedVideoDesigns={savedVideoDesigns}
             onEditBrandPreset={handleEditBrandPreset}
             onEditInstagramDesign={handleEditInstagramDesign}
+            onEditVideoDesign={handleEditVideoDesign}
             onDeleteBrandVersion={(id) =>
               setSavedBrandVersions((prev) => prev.filter((v) => v.id !== id))
             }
@@ -221,6 +279,9 @@ export function App() {
               setSavedInstagramDesigns((prev) =>
                 prev.filter((d) => d.id !== id)
               )
+            }
+            onDeleteVideoDesign={(id) =>
+              setSavedVideoDesigns((prev) => prev.filter((v) => v.id !== id))
             }
           />
         )}

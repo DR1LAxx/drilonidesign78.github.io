@@ -1,4 +1,4 @@
-export type WorkspaceTab = 'editor' | 'instagram' | 'vault';
+export type WorkspaceTab = 'editor' | 'instagram' | 'video' | 'vault';
 
 export type BrandAssetFormat =
   | 'primary'
@@ -95,6 +95,71 @@ export interface InstagramConfig {
 }
 
 export interface SavedInstagramDesign extends InstagramConfig {
+  id: string;
+  savedAt: string;
+}
+
+export type VideoFormat = 'reel' | 'square' | 'portrait' | 'landscape';
+
+export type VideoTemplateId =
+  | 'midnight-pulse'
+  | 'okarina-kinetic'
+  | 'waveform-showcase'
+  | 'launch-teaser'
+  | 'editorial-reel';
+
+export type AudioSourceMode = 'studio' | 'upload' | 'url' | 'none';
+
+export type StudioAudioTrackId =
+  | 'okarina-breeze'
+  | 'midnight-mesh'
+  | 'indigo-pulse'
+  | 'quiet-studio'
+  | 'mint-horizon';
+
+export interface VideoConfig {
+  id?: string;
+  name: string;
+  format: VideoFormat;
+  templateId: VideoTemplateId;
+  durationSec: number; // 5, 10, 15, 30
+  eyebrow: string;
+  headline: string;
+  body: string;
+  footerHandle: string;
+  dateLabel: string;
+  ctaText: string;
+  // Styling
+  bgColor: string;
+  backdropStyle: BackdropStyle;
+  textColor: string;
+  mutedTextColor: string;
+  accentColor: string;
+  markFill: string;
+  markDetailColor: string;
+  markSubtleDetailColor: string;
+  mouthpieceColor: string;
+  // Motion & Audio reactivity
+  logoVariant: 'horizontal' | 'stacked' | 'mark' | 'none';
+  textAlign: 'left' | 'center';
+  headlineScale: number;
+  showMintAccent: boolean;
+  showWaveform: boolean;
+  motionIntensity: number; // 0.3 to 1.6
+  // Photo backdrop
+  photoDataUrl: string | null;
+  scrimOpacity: number;
+  // Audio settings
+  audioMode: AudioSourceMode;
+  studioTrackId: StudioAudioTrackId;
+  audioUrl: string;
+  uploadedAudioName: string;
+  audioVolume: number; // 0 to 1
+  audioStartSec: number;
+  audioFadeInOut: boolean;
+}
+
+export interface SavedVideoDesign extends VideoConfig {
   id: string;
   savedAt: string;
 }
