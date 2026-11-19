@@ -4,6 +4,8 @@ import {
   AlignLeft,
   BookmarkPlus,
   Check,
+  Code2,
+  Copy,
   Download,
   ImagePlus,
   Layers,
@@ -113,6 +115,41 @@ const BACKDROP_OPTIONS: { id: BackdropStyle; label: string }[] = [
   { id: 'solid', label: 'Solid Flat' },
 ];
 
+function getBackdropCss(bgColor: string, style: BackdropStyle): string {
+  switch (style) {
+    case 'midnight-mesh':
+      return `background-color: ${bgColor};\nbackground-image:\n  radial-gradient(circle at 82% 16%, rgba(41, 57, 240, 0.48) 0%, rgba(41, 57, 240, 0) 60%),\n  radial-gradient(circle at 15% 84%, rgba(24, 213, 168, 0.22) 0%, rgba(24, 213, 168, 0) 55%);`;
+    case 'indigo-aura':
+      return `background-color: ${bgColor};\nbackground-image:\n  radial-gradient(circle at 78% 78%, rgba(24, 213, 168, 0.25) 0%, rgba(24, 213, 168, 0) 52%),\n  linear-gradient(135deg, rgba(92, 124, 250, 0.45) 0%, rgba(41, 57, 240, 0.1) 55%, rgba(11, 17, 32, 0.55) 100%);`;
+    case 'cool-mist':
+      return `background-color: ${bgColor};\nbackground-image:\n  radial-gradient(circle at 88% 14%, rgba(41, 57, 240, 0.1) 0%, rgba(41, 57, 240, 0) 55%),\n  radial-gradient(circle at 12% 88%, rgba(24, 213, 168, 0.14) 0%, rgba(24, 213, 168, 0) 52%);`;
+    case 'mint-horizon':
+      return `background-color: ${bgColor};\nbackground-image:\n  radial-gradient(circle at 50% 92%, rgba(24, 213, 168, 0.34) 0%, rgba(41, 57, 240, 0.22) 45%, rgba(11, 17, 32, 0) 75%);`;
+    case 'navy-grid':
+      return `background-color: ${bgColor};\nbackground-image:\n  radial-gradient(circle at 50% 22%, rgba(92, 124, 250, 0.22) 0%, rgba(11, 17, 32, 0) 62%),\n  linear-gradient(to right, rgba(148, 163, 184, 0.09) 1px, transparent 1px),\n  linear-gradient(to bottom, rgba(148, 163, 184, 0.09) 1px, transparent 1px);\nbackground-size: 100% 100%, 72px 72px, 72px 72px;`;
+    default:
+      return `background-color: ${bgColor};`;
+  }
+}
+
+function getBackdropPrompt(bgColor: string, style: BackdropStyle): string {
+  const styleDesc: Record<BackdropStyle, string> = {
+    'midnight-mesh':
+      'deep navy (#0B1120) canvas with an atmospheric Electric Indigo (#2939F0, 48% opacity) radial glow in the upper-right and a subtle Mint (#18D5A8, 22% opacity) radial glow in the lower-left',
+    'indigo-aura':
+      'rich indigo-to-navy diagonal gradient wash (Periwinkle #5C7CFA to Deep Navy #0B1120) accented with a soft Mint (#18D5A8, 25% opacity) radial glow in the lower-right',
+    'cool-mist':
+      'crisp off-white (#F5F7FB) canvas with whisper-soft Electric Indigo (10% opacity) upper-right and Mint (14% opacity) lower-left ambient radial washes',
+    'mint-horizon':
+      'deep navy (#0B1120) surface illuminated from the bottom center by a Mint (#18D5A8, 34% opacity) into Electric Indigo (#2939F0, 22% opacity) horizon glow',
+    'navy-grid':
+      'deep navy (#0B1120) canvas overlaid with a fine 72px architectural hairline grid (rgba(148,163,184,0.09)) and a soft Periwinkle (#5C7CFA, 22% opacity) top-center radial spotlight',
+    solid: `clean flat ${bgColor} surface without gradients`,
+  };
+
+  return `Use the okarina brand background design for the main landing page of okarina.dev: a full-bleed ${styleDesc[style]} (base ${bgColor}). Pair with crisp Outfit display headings, Plus Jakarta Sans body copy, and Mint (#18D5A8) as a restrained primary accent rule/CTA highlight so foreground content keeps >= 4.5:1 contrast.`;
+}
+
 export const InstagramStudio: React.FC<InstagramStudioProps> = ({
   config,
   onChange,
@@ -124,6 +161,7 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
   const [designName, setDesignName] = useState(config.name || 'Instagram Post');
   const [justSaved, setJustSaved] = useState(false);
+  const [copiedType, setCopiedType] = useState<'prompt' | 'css' | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const meta = INSTAGRAM_FORMAT_META[config.format];
@@ -715,6 +753,50 @@ export const InstagramStudio: React.FC<InstagramStudioProps> = ({
             value={config.accentColor}
             onChange={(accentColor) => update({ accentColor })}
           />
+
+          <div className="pt-1">
+            <span className="block text-[11px] font-medium text-slate-500 mb-1.5">
+              Reuse on okarina.dev
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(
+                    getBackdropPrompt(config.bgColor, config.backdropStyle)
+                  );
+                  setCopiedType('prompt');
+                  setTimeout(() => setCopiedType(null), 1800);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors"
+              >
+                {copiedType === 'prompt' ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+                {copiedType === 'prompt' ? 'Copied Prompt' : 'Copy Prompt'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(
+                    getBackdropCss(config.bgColor, config.backdropStyle)
+                  );
+                  setCopiedType('css');
+                  setTimeout(() => setCopiedType(null), 1800);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors"
+              >
+                {copiedType === 'css' ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Code2 className="w-3.5 h-3.5" />
+                )}
+                {copiedType === 'css' ? 'Copied CSS' : 'Copy CSS'}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Layout & Lockup */}
