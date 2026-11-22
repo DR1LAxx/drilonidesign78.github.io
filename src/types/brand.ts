@@ -1,4 +1,4 @@
-export type WorkspaceTab = 'editor' | 'instagram' | 'video' | 'sfx' | 'vault';
+export type WorkspaceTab = 'home' | 'instagram' | 'video' | 'sfx' | 'editor' | 'vault';
 
 export type BrandAssetFormat =
   | 'primary'

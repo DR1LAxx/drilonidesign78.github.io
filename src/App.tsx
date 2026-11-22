@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Archive, Download, Film, Image as ImageIcon, Menu, PenTool, Volume2, X } from 'lucide-react';
+import { Archive, Download, Film, Home, Image as ImageIcon, Menu, PenTool, Volume2, X } from 'lucide-react';
 import { AssetVault } from './components/AssetVault';
 import { BrandEditor } from './components/BrandEditor';
 import { DownloadTray } from './components/DownloadTray';
+import { HomePage } from './components/HomePage';
 import { InstagramStudio } from './components/InstagramStudio';
 import { OkarinaMark } from './components/OkarinaMark';
 import {
@@ -39,7 +40,7 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('editor');
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [brandConfig, setBrandConfig] = useState<BrandConfig>(
     DEFAULT_BRAND_CONFIG
@@ -200,10 +201,11 @@ export function App() {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
   }[] = [
-    { id: 'editor', label: 'Brand Editor', icon: PenTool },
+    { id: 'home', label: 'Home', icon: Home },
     { id: 'instagram', label: 'Instagram Studio', icon: ImageIcon },
     { id: 'video', label: 'Video Studio', icon: Film },
     { id: 'sfx', label: 'Sound Effects', icon: Volume2 },
+    { id: 'editor', label: 'Brand Editor', icon: PenTool },
     { id: 'vault', label: 'Asset Vault', icon: Archive },
   ];
 
@@ -214,7 +216,10 @@ export function App() {
         {/* Zone 1: Single-line Brand Wordmark */}
         <button
           type="button"
-          onClick={() => setActiveTab('editor')}
+          onClick={() => {
+            setActiveTab('home');
+            setMobileMenuOpen(false);
+          }}
           className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5C7CFA] rounded-md"
         >
           <OkarinaMark
@@ -267,7 +272,7 @@ export function App() {
             className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg bg-[#2939F0] text-white hover:bg-[#1E2CD4] transition-colors whitespace-nowrap shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
-            {activeTab === 'vault'
+            {activeTab === 'home' || activeTab === 'vault'
               ? 'New Instagram Post'
               : activeTab === 'video'
               ? 'Export Video'
@@ -349,6 +354,17 @@ export function App() {
 
       {/* Main Active Workspace */}
       <main className="flex-1">
+        {activeTab === 'home' && (
+          <HomePage
+            savedCount={
+              savedBrandVersions.length +
+              savedInstagramDesigns.length +
+              savedVideoDesigns.length
+            }
+            onNavigate={setActiveTab}
+          />
+        )}
+
         {activeTab === 'editor' && (
           <BrandEditor
             config={brandConfig}
