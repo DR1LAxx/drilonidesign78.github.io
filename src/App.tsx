@@ -424,6 +424,30 @@ export function App() {
         )}
       </main>
 
+      <footer className="border-t border-slate-800/80 bg-[#0F172A]/80 px-4 sm:px-6 py-4">
+        <div className="max-w-[1360px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <OkarinaMark
+              fill="#5C7CFA"
+              detailColor="#0B1120"
+              subtleDetailColor="#1E294B"
+              mouthpieceColor="#0B1120"
+              className="h-4 w-auto"
+            />
+            <span>okarina Brand Studio</span>
+          </div>
+
+          <a
+            href="https://okarina.dev"
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-300 hover:text-white transition-colors"
+          >
+            Built by <span className="text-[#5C7CFA] font-semibold">okarina.dev</span>
+          </a>
+        </div>
+      </footer>
+
       <DownloadTray />
     </div>
   );

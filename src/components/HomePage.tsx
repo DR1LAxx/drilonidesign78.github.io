@@ -311,7 +311,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <span className="text-[11px] font-mono-tabular text-[#18D5A8]">
-                  Built for okarina.dev
+                  Built by okarina.dev
                 </span>
               </div>
 
